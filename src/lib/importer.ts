@@ -96,7 +96,6 @@ function applyMapping(raw: AnyRecord, mapping: FieldMapping): ParsedProduct {
 
 function buildDiagnostics(rawItems: AnyRecord[], mapping: FieldMapping): { diagnostics: MappingDiagnostic[]; rawKeys: string[]; attributeSample: Record<string, string> } {
   const firstRaw = rawItems[0] ?? {}
-  const sample20 = rawItems.slice(0, 200)
 
   const diagnostics: MappingDiagnostic[] = (Object.entries(mapping) as [string, string][])
     .filter(([, feedKey]) => feedKey)
@@ -109,20 +108,29 @@ function buildDiagnostics(rawItems: AnyRecord[], mapping: FieldMapping): { diagn
   const mappedValues = new Set(Object.values(mapping).filter(Boolean))
   const attributeSample: Record<string, string> = {}
 
-  // Collect all attribute keys from the first 20 products
-  for (const raw of sample20) {
+  // Pass 1: collect all unmapped keys that appear anywhere in the feed
+  for (const raw of rawItems) {
     for (const [k] of Object.entries(raw)) {
       if (!mappedValues.has(k) && !(k in attributeSample)) {
         attributeSample[k] = ''
       }
     }
+    // Stop early once we have a non-empty sample for every key found so far
+    if (Object.keys(attributeSample).length > 0 &&
+        Object.values(attributeSample).every(v => v !== '')) break
   }
 
-  // For each discovered key, find the first non-empty sample value
-  for (const key of Object.keys(attributeSample)) {
-    for (const raw of sample20) {
-      const s = extractString(raw[key]).slice(0, 80)
-      if (s) { attributeSample[key] = s; break }
+  // Pass 2: for keys still empty, scan until we find a non-empty value
+  const needsSample = Object.keys(attributeSample).filter(k => attributeSample[k] === '')
+  if (needsSample.length > 0) {
+    for (const raw of rawItems) {
+      for (const key of needsSample) {
+        if (attributeSample[key] === '') {
+          const s = extractString(raw[key]).slice(0, 80)
+          if (s) attributeSample[key] = s
+        }
+      }
+      if (needsSample.every(k => attributeSample[k] !== '')) break
     }
   }
 
