@@ -130,6 +130,7 @@ interface Flow {
   maatwerkEmailTo?: string
   maatwerkFields?: MaatwerkField[]
   maatwerkIncludeAddress?: boolean
+  demoEnabled?: boolean
 }
 
 interface ProductHit {
@@ -2637,6 +2638,38 @@ export default function FlowEditorPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </section>
+
+          {/* ── Demo ──────────────────────────────────────── */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-1 pt-2">Demo</p>
+
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-semibold text-gray-800">Testshop-demo</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={flow.demoEnabled ?? false}
+                  onChange={e => update(f => ({ ...f, demoEnabled: e.target.checked }))}
+                  className="w-4 h-4 rounded text-blue-600"
+                />
+                <span className="text-sm text-gray-600">{flow.demoEnabled ? 'Aan' : 'Uit'}</span>
+              </label>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              Maakt een publieke demo-pagina aan op{' '}
+              <code className="bg-gray-100 px-1 rounded">/demo/{id}</code> zonder inloggen.
+            </p>
+            {flow.demoEnabled && (
+              <a
+                href={`/demo/${id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Demo bekijken →
+              </a>
             )}
           </section>
 

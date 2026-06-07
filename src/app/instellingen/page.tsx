@@ -266,23 +266,15 @@ export default function InstellingenPage() {
       <section className="bg-white rounded-xl border border-gray-200 p-5">
         <h2 className="font-semibold text-gray-800 mb-1">Testshop (demo-omgeving)</h2>
         <p className="text-xs text-gray-400 mb-4">
-          Publieke pagina op <code className="bg-gray-100 px-1 rounded">/demo</code> die de keuzehulp in een nep-shopomgeving toont.
-          Deel de link met klanten of stakeholders zonder inloggen.
+          Elke keuzehulp heeft een eigen demo-URL (<code className="bg-gray-100 px-1 rounded">/demo/[id]</code>).
+          Schakel demo per keuzehulp in via de Instellingen-tab van die flow.
+          Hier stel je alleen de algemene winkelnaam in.
         </p>
-        <div className="space-y-0 divide-y divide-gray-50">
-          <div className="flex items-center justify-between py-3">
-            <p className="text-sm text-gray-700">Testshop ingeschakeld</p>
-            <button
-              onClick={() => set('demo_enabled', settings['demo_enabled'] === '1' ? '0' : '1')}
-              className={`relative w-10 h-5 rounded-full transition-colors ${settings['demo_enabled'] === '1' ? 'bg-blue-600' : 'bg-gray-200'}`}
-            >
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings['demo_enabled'] === '1' ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
+        <div className="divide-y divide-gray-50">
           <div className="flex items-start justify-between gap-6 py-3">
             <div>
               <p className="text-sm text-gray-700">Winkelnaam</p>
-              <p className="text-xs text-gray-400 mt-0.5">Getoond in de shopheader en footer</p>
+              <p className="text-xs text-gray-400 mt-0.5">Getoond in de shopheader en footer van alle demo&apos;s</p>
             </div>
             <input
               value={settings['demo_shop_name'] ?? ''}
@@ -291,34 +283,11 @@ export default function InstellingenPage() {
               className="w-64 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 shrink-0"
             />
           </div>
-          <div className="flex items-start justify-between gap-6 py-3">
-            <div>
-              <p className="text-sm text-gray-700">Keuzehulp</p>
-              <p className="text-xs text-gray-400 mt-0.5">Welke configurator wordt getoond</p>
-            </div>
-            <select
-              value={settings['demo_flow_id'] ?? ''}
-              onChange={e => set('demo_flow_id', e.target.value)}
-              className="w-64 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 shrink-0 bg-white"
-            >
-              <option value="">— Selecteer een keuzehulp —</option>
-              {flows.map(f => (
-                <option key={f._id} value={f._id}>{f.name}</option>
-              ))}
-            </select>
+          <div className="py-3">
+            <a href="/demo" target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+              Demo-overzicht bekijken →
+            </a>
           </div>
-          {settings['demo_enabled'] === '1' && settings['demo_flow_id'] && (
-            <div className="py-3">
-              <a
-                href="/demo"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
-              >
-                Demo bekijken →
-              </a>
-            </div>
-          )}
         </div>
       </section>
 

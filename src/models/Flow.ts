@@ -129,6 +129,7 @@ export interface IFlow extends Document {
   maatwerkEmailTo: string
   maatwerkFields: MaatwerkField[]
   maatwerkIncludeAddress: boolean
+  demoEnabled: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -212,6 +213,7 @@ const FlowSchema = new Schema<IFlow>(
     maatwerkEmailTo: { type: String, default: '' },
     maatwerkFields: [MaatwerkFieldSchema],
     maatwerkIncludeAddress: { type: Boolean, default: false },
+    demoEnabled: { type: Boolean, default: false },
   },
   { timestamps: true }
 )

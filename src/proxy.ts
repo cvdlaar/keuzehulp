@@ -8,6 +8,7 @@ const PUBLIC_API = [
   /^\/api\/events$/,                          // event tracking
   /^\/api\/setup$/,                           // eenmalige bootstrap
   /^\/api\/demo$/,                            // testshop config (publiek)
+  /^\/api\/demo\/[^/]+$/,                    // per-flow demo config (publiek)
   /^\/api\/cart$/,                            // add-to-cart proxy
   /^\/api\/cron$/,                            // geplande imports (eigen auth via CRON_SECRET)
   /^\/api\/email-results$/,                  // mail mij de resultaten
