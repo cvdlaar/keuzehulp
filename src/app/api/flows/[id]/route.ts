@@ -20,7 +20,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/flows/[id]'>
   const fields = [
     'name','description','startQuestionId','questions','active','boostConfig',
     'adobeCommerceUrl','widgetStyle','widgetBehavior','emailResults','emailSubject',
-    'spotlerAttributes','resultsSummaryTemplate','displayAttributes',
+    'spotlerAttributes','resultsSummaryTemplate','displayAttributes','resultsTitle',
+    'maatwerkTitle','maatwerkIntro','maatwerkEmailTo','maatwerkFields','maatwerkIncludeAddress',
   ]
   for (const f of fields) {
     if (body[f] !== undefined) update[f] = body[f]
