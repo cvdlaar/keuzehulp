@@ -4,7 +4,7 @@ import { login } from '@/app/actions/auth'
 
 function Illustration() {
   return (
-    <svg viewBox="0 0 560 640" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg viewBox="0 0 560 640" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
       <defs>
         <radialGradient id="bg" cx="40%" cy="35%" r="70%">
           <stop offset="0%" stopColor="#1d4ed8" />
@@ -116,7 +116,7 @@ export default function LoginPage() {
   return (
     <div className="h-screen overflow-hidden flex">
       {/* Illustratie — verborgen op mobiel */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden" style={{ backgroundColor: '#0f172a' }}>
         <Illustration />
         <div className="absolute inset-0 flex flex-col justify-end p-12 pointer-events-none">
           <p className="text-white text-3xl font-bold leading-snug mb-2">
