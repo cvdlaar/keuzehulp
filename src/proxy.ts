@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { decrypt } from '@/lib/session'
 
-const PUBLIC_PREFIXES = ['/login', '/setup', '/widget', '/_next', '/favicon.ico']
+const PUBLIC_PREFIXES = ['/login', '/setup', '/demo', '/widget', '/_next', '/favicon.ico']
 
 // API routes die altijd publiek zijn (widget + bootstrap + tracking)
 const PUBLIC_API = [
   /^\/api\/events$/,                          // event tracking
   /^\/api\/setup$/,                           // eenmalige bootstrap
+  /^\/api\/demo$/,                            // testshop config (publiek)
   /^\/api\/cart$/,                            // add-to-cart proxy
   /^\/api\/cron$/,                            // geplande imports (eigen auth via CRON_SECRET)
   /^\/api\/email-results$/,                  // mail mij de resultaten
