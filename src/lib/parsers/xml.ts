@@ -93,6 +93,7 @@ export function parseXMLFeed(xml: string): ParsedProduct[] {
       ean: getString(raw, 'gtin'),
       sku: getString(raw, 'mpn', 'id'),
       category: getString(raw, 'product_type', 'google_product_category'),
+      qtyIncrement: raw['qty_increments'] ? parseInt(String(raw['qty_increments'])) || 1 : 1,
       attributes,
     }
   })

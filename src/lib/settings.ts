@@ -12,7 +12,7 @@ export async function getSetting(key: string): Promise<string> {
     cache = Object.fromEntries(all.map(s => [s.key, s.value]))
     cacheAt = Date.now()
   }
-  return cache[key] ?? ''
+  return cache![key] ?? ''
 }
 
 // Geeft DB-waarde terug als die niet leeg is, anders de env var

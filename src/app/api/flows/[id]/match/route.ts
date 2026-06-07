@@ -353,7 +353,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/flows/[id]/
         default:            return null
       }
     }))
-    .filter((f): f is Record<string, unknown> => f !== null && Object.keys(f).length > 0)
+    .filter((f): f is NonNullable<typeof f> => f !== null && Object.keys(f as object).length > 0) as Record<string, unknown>[]
 
   let related: ScoredProduct[] = []
   if (relatedPinnedIds.length > 0 || relatedRuleFilters.length > 0) {

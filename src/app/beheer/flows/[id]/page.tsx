@@ -2106,7 +2106,7 @@ export default function FlowEditorPage() {
 
       {/* ── Tab: Voorbeeld ── */}
       {activeTab === 'preview' && (() => {
-        const ws = flow.widgetStyle ?? {}
+        const ws = flow.widgetStyle ?? {} as { primaryColor?: string; borderRadius?: string; fontFamily?: string }
         const params = new URLSearchParams()
         if (ws.primaryColor)  params.set('color',  ws.primaryColor)
         if (ws.borderRadius)  params.set('radius', ws.borderRadius)

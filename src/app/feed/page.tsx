@@ -109,7 +109,7 @@ export default function FeedPage() {
         const r = await fetch(`/api/logs/${logId}`)
         if (!r.ok) return
         const log = await r.json() as ImportProgress & { status: string }
-        setImportProgress({ logId, feedId: id, ...log } as ImportProgress)
+        setImportProgress({ ...log, logId, feedId: id } as ImportProgress)
 
         if (log.status !== 'running') {
           clearInterval(poll)

@@ -88,6 +88,7 @@ interface ScoredProduct {
     link: string
     availability: string
     sku: string
+    qtyIncrement?: number
   }
   score: number
   isPerfect: boolean

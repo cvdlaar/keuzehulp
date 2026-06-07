@@ -53,6 +53,7 @@ export function parseCSVFeed(csv: string): ParsedProduct[] {
       ean: '',
       sku: '',
       category: '',
+      qtyIncrement: 1,
       attributes: {},
     }
 
