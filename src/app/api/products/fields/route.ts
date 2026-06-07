@@ -18,8 +18,12 @@ export async function GET(req: NextRequest) {
   const agg: AggRow[] = await Product.aggregate([
     { $project: { kvs: { $objectToArray: { $ifNull: ['$attributes', {}] } } } },
     { $unwind: '$kvs' },
-    { $match: { 'kvs.v': { $nin: [null, '', 0, false] } } },
-    { $group: { _id: '$kvs.k', count: { $sum: 1 }, samples: { $push: { $toString: '$kvs.v' } } } },
+    { $group: {
+      _id: '$kvs.k',
+      count: { $sum: { $cond: [{ $and: [{ $ne: ['$kvs.v', ''] }, { $ne: ['$kvs.v', null] }] }, 1, 0] } },
+      samples: { $push: { $cond: [{ $and: [{ $ne: ['$kvs.v', ''] }, { $ne: ['$kvs.v', null] }] }, { $toString: '$kvs.v' }, '$$REMOVE'] } },
+    } },
+    { $match: { count: { $gt: 0 } } },
     { $project: { _id: 1, count: 1, samples: { $slice: ['$samples', 3] } } },
     { $sort: { _id: 1 } },
   ])

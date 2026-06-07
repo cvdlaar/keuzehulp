@@ -96,6 +96,13 @@ export default function Sidebar() {
             {pending ? 'Uitloggen…' : '← Uitloggen'}
           </button>
         </form>
+        <p className="text-[10px] text-white/25 px-3 pt-1 leading-tight">
+          {process.env.NEXT_PUBLIC_BUILD_COMMIT ?? 'local'}
+          {' · '}
+          {process.env.NEXT_PUBLIC_BUILD_TIME
+            ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+            : '—'}
+        </p>
       </div>
     </aside>
   )

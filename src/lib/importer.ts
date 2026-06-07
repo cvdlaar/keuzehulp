@@ -59,7 +59,7 @@ function applyMapping(raw: AnyRecord, mapping: FieldMapping): ParsedProduct {
     if (mappedValues.has(k)) continue
 
     const s = extractString(v)
-    if (s) {
+    if (s || (v !== null && v !== undefined && typeof v !== 'object')) {
       attributes[k] = s
     } else if (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) {
       // Genest XML-object (bijv. <g:shipping> met sub-elementen) — één niveau platslaan.
