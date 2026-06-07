@@ -9,7 +9,7 @@ export async function POST(_req: NextRequest, ctx: RouteContext<'/api/flows/[id]
   const original = await Flow.findById(id).lean()
   if (!original) return NextResponse.json({ error: 'Niet gevonden' }, { status: 404 })
 
-  const { _id, createdAt, updatedAt, ...rest } = original as Record<string, unknown>
+  const { _id, createdAt, updatedAt, ...rest } = original as unknown as Record<string, unknown>
   void _id; void createdAt; void updatedAt
 
   const copy = await Flow.create({
