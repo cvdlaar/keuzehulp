@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 
 interface Product {
   _id: string
@@ -11,11 +12,16 @@ interface Product {
   price: number
   salePrice: number | null
   lowestPrice: number | null
+  description: string
   shortDescription: string
   availability: string
   imageLink: string
   link: string
   ean: string
+  sku: string
+  qtyIncrement: number
+  attributes: Record<string, string>
+  updatedAt: string
 }
 
 interface ProductsResponse {
@@ -23,6 +29,23 @@ interface ProductsResponse {
   total: number
   page: number
   pages: number
+}
+
+interface ProductStats {
+  shown: number
+  clicks: number
+  addToCarts: number
+}
+
+interface FlowRef {
+  id: string
+  name: string
+}
+
+interface ProductDetail {
+  product: Product
+  stats: ProductStats
+  flows: FlowRef[]
 }
 
 export default function ProductenPage() {
@@ -33,6 +56,9 @@ export default function ProductenPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<ProductDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -46,6 +72,14 @@ export default function ProductenPage() {
   }, [page, search, category, availability])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!selectedId) { setDetail(null); return }
+    setDetailLoading(true)
+    fetch(`/api/products/${selectedId}/stats`)
+      .then((r) => r.json())
+      .then((d) => { setDetail(d); setDetailLoading(false) })
+  }, [selectedId])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -136,7 +170,11 @@ export default function ProductenPage() {
             </thead>
             <tbody>
               {data.products.map((p) => (
-                <tr key={p._id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                <tr
+                  key={p._id}
+                  onClick={() => setSelectedId(p._id === selectedId ? null : p._id)}
+                  className={`border-b border-gray-50 last:border-0 hover:bg-blue-50 cursor-pointer transition-colors ${selectedId === p._id ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''}`}
+                >
                   <td className="px-4 py-3">
                     {p.imageLink ? (
                       <img src={p.imageLink} alt="" className="w-10 h-10 object-contain rounded border border-gray-100" />
@@ -145,11 +183,11 @@ export default function ProductenPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 hover:text-blue-600 line-clamp-2">
-                      {p.title}
-                    </a>
+                    <span className="font-medium text-gray-900 line-clamp-2">{p.title}</span>
                     {p.shortDescription && (
-                      <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{p.shortDescription}</p>
+                      <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">
+                        {p.shortDescription.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}
+                      </p>
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{p.brand || '—'}</td>
@@ -205,6 +243,243 @@ export default function ProductenPage() {
           </div>
         </div>
       )}
+
+      {/* Product detail drawer */}
+      {selectedId && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/20" onClick={() => setSelectedId(null)} />
+          <div className="relative bg-white w-full max-w-lg h-full overflow-y-auto shadow-2xl border-l border-gray-200">
+            {detailLoading || !detail ? (
+              <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Laden…</div>
+            ) : (
+              <ProductDetailPanel
+                detail={detail}
+                onClose={() => setSelectedId(null)}
+                formatPrice={formatPrice}
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProductDetailPanel({
+  detail,
+  onClose,
+  formatPrice,
+}: {
+  detail: ProductDetail
+  onClose: () => void
+  formatPrice: (p: number) => string
+}) {
+  const { product: p, stats, flows } = detail
+  const attributes = p.attributes ? Object.entries(p.attributes) : []
+
+  return (
+    <div>
+      {/* Sticky header */}
+      <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between z-10">
+        <span className="text-sm font-medium text-gray-700">Productdetails</span>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+          aria-label="Sluiten"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="p-5 space-y-6">
+        {/* Afbeelding + titel */}
+        <div className="flex gap-4">
+          {p.imageLink ? (
+            <img
+              src={p.imageLink}
+              alt=""
+              className="w-24 h-24 object-contain rounded-lg border border-gray-100 flex-shrink-0 bg-gray-50"
+            />
+          ) : (
+            <div className="w-24 h-24 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-gray-300 text-xs flex-shrink-0">
+              Geen afb.
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="font-semibold text-gray-900 text-base leading-snug mb-2">{p.title}</h2>
+            <div className="flex flex-wrap gap-1.5">
+              {p.brand && (
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{p.brand}</span>
+              )}
+              {p.category && (
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">{p.category}</span>
+              )}
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.availability === 'in stock' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                {p.availability === 'in stock' ? 'Op voorraad' : p.availability === 'out of stock' ? 'Niet op voorraad' : p.availability}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Prijs */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="text-xs text-gray-500 mb-1">Prijs</div>
+          {p.lowestPrice && p.lowestPrice < p.price ? (
+            <div>
+              <span className="text-sm text-gray-400 mr-2">Vanaf</span>
+              <span className="text-xl font-bold text-blue-600">{formatPrice(p.lowestPrice)}</span>
+              <span className="line-through text-gray-400 ml-2 text-sm">{formatPrice(p.price)}</span>
+            </div>
+          ) : p.salePrice ? (
+            <div>
+              <span className="line-through text-gray-400 mr-2">{formatPrice(p.price)}</span>
+              <span className="text-xl font-bold text-green-600">{formatPrice(p.salePrice)}</span>
+            </div>
+          ) : (
+            <span className="text-xl font-bold text-gray-900">{formatPrice(p.price)}</span>
+          )}
+        </div>
+
+        {/* Statistieken */}
+        <div>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Statistieken</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="Getoond" value={stats.shown} color="blue" />
+            <StatCard label="Geklikt" value={stats.clicks} color="purple" />
+            <StatCard label="In winkelwagen" value={stats.addToCarts} color="green" />
+          </div>
+          {stats.shown > 0 && (
+            <p className="text-xs text-gray-400 mt-2">
+              Click-through: {Math.round((stats.clicks / stats.shown) * 100)}%
+              {stats.clicks > 0 && ` · Cart rate: ${Math.round((stats.addToCarts / stats.clicks) * 100)}%`}
+            </p>
+          )}
+        </div>
+
+        {/* In configurators */}
+        <div>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">In configurators</h3>
+          {flows.length === 0 ? (
+            <p className="text-sm text-gray-400">Niet vastgezet in een configurator.</p>
+          ) : (
+            <div className="space-y-2">
+              {flows.map((f) => (
+                <Link
+                  key={f.id}
+                  href={`/beheer/flows/${f.id}`}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                >
+                  <span className="text-sm text-gray-700 group-hover:text-blue-700">{f.name}</span>
+                  <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-400 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Productinformatie */}
+        <div>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Productinformatie</h3>
+          <dl className="space-y-2.5 text-sm">
+            {p.link && (
+              <div className="flex gap-2">
+                <dt className="text-gray-400 w-32 flex-shrink-0">Link</dt>
+                <dd>
+                  <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    Bekijk product ↗
+                  </a>
+                </dd>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <dt className="text-gray-400 w-32 flex-shrink-0">Extern ID</dt>
+              <dd className="font-mono text-gray-700 text-xs break-all">{p.externalId}</dd>
+            </div>
+            {p.qtyIncrement > 1 && (
+              <div className="flex gap-2">
+                <dt className="text-gray-400 w-32 flex-shrink-0">Verkoophoeveelheid</dt>
+                <dd className="text-gray-700">Per {p.qtyIncrement} stuks</dd>
+              </div>
+            )}
+            {p.ean && (
+              <div className="flex gap-2">
+                <dt className="text-gray-400 w-32 flex-shrink-0">EAN</dt>
+                <dd className="font-mono text-gray-700 text-xs">{p.ean}</dd>
+              </div>
+            )}
+            {p.sku && (
+              <div className="flex gap-2">
+                <dt className="text-gray-400 w-32 flex-shrink-0">SKU</dt>
+                <dd className="font-mono text-gray-700 text-xs">{p.sku}</dd>
+              </div>
+            )}
+            {p.shortDescription && (
+              <div className="flex gap-2">
+                <dt className="text-gray-400 w-32 flex-shrink-0">Omschrijving</dt>
+                <dd
+                  className="text-gray-700 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0.5"
+                  dangerouslySetInnerHTML={{ __html: p.shortDescription }}
+                />
+              </div>
+            )}
+            {p.description && p.description !== p.shortDescription && (
+              <div className="flex gap-2">
+                <dt className="text-gray-400 w-32 flex-shrink-0">Volledige beschr.</dt>
+                <dd
+                  className="text-gray-700 text-sm line-clamp-6"
+                  dangerouslySetInnerHTML={{ __html: p.description }}
+                />
+              </div>
+            )}
+            {p.updatedAt && (
+              <div className="flex gap-2">
+                <dt className="text-gray-400 w-32 flex-shrink-0">Bijgewerkt</dt>
+                <dd className="text-gray-600">{new Date(p.updatedAt).toLocaleDateString('nl-NL')}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+
+        {/* Attributen */}
+        {attributes.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Attributen ({attributes.length})
+            </h3>
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <table className="w-full text-xs">
+                <tbody>
+                  {attributes.map(([key, val]) => (
+                    <tr key={key} className="border-b border-gray-100 last:border-0">
+                      <td className="px-3 py-2 text-gray-400 font-medium bg-gray-50 w-36 align-top">{key}</td>
+                      <td className="px-3 py-2 text-gray-700">{String(val)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, color }: { label: string; value: number; color: 'blue' | 'purple' | 'green' }) {
+  const styles = {
+    blue:   { bg: 'bg-blue-50',   label: 'text-blue-600',   value: 'text-blue-900' },
+    purple: { bg: 'bg-purple-50', label: 'text-purple-600', value: 'text-purple-900' },
+    green:  { bg: 'bg-green-50',  label: 'text-green-600',  value: 'text-green-900' },
+  }
+  const s = styles[color]
+  return (
+    <div className={`${s.bg} rounded-lg p-3 text-center`}>
+      <div className={`text-2xl font-bold ${s.value}`}>{value.toLocaleString('nl-NL')}</div>
+      <div className={`text-xs ${s.label} mt-0.5`}>{label}</div>
     </div>
   )
 }

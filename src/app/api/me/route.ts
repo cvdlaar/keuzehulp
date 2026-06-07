@@ -7,6 +7,10 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json(null, { status: 401 })
 
+  if (session.userId === 'dev') {
+    return NextResponse.json({ name: 'Dev Admin', email: 'admin', role: session.role })
+  }
+
   await connectDB()
   const user = await User.findById(session.userId).select('name email role').lean()
   if (!user) return NextResponse.json(null, { status: 401 })

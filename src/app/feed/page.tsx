@@ -28,11 +28,22 @@ interface PreviewData {
 
 const emptyForm = { name: '', url: '', format: 'xml' as 'xml' | 'csv' }
 
+interface ImportProgress {
+  logId: string
+  feedId: string
+  status: 'running' | 'success' | 'error'
+  imported: number
+  updated: number
+  skipped: number
+  totalInFeed: number
+}
+
 export default function FeedPage() {
   const [configs, setConfigs] = useState<FeedConfig[]>([])
   const [form, setForm] = useState(emptyForm)
   const [editId, setEditId] = useState<string | null>(null)
   const [importing, setImporting] = useState<string | null>(null)
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
   const [previewing, setPreviewing] = useState<string | null>(null)
   const [previewData, setPreviewData] = useState<Record<string, PreviewData>>({})
   const [mappingId, setMappingId] = useState<string | null>(null)
@@ -75,19 +86,45 @@ export default function FeedPage() {
 
   const handleImport = async (id: string) => {
     setImporting(id)
+    setImportProgress(null)
+
     const res = await fetch('/api/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feedConfigId: id }),
     })
-    setImporting(null)
-    if (res.ok) {
-      notify('ok', 'Import succesvol afgerond.')
-      load()
-    } else {
+
+    if (!res.ok) {
+      setImporting(null)
       const err = await res.json()
       notify('err', `Import mislukt: ${err.error}`)
+      return
     }
+
+    const { logId } = await res.json()
+
+    // Poll de voortgang elke seconde
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/logs/${logId}`)
+        if (!r.ok) return
+        const log = await r.json() as ImportProgress & { status: string }
+        setImportProgress({ logId, feedId: id, ...log } as ImportProgress)
+
+        if (log.status !== 'running') {
+          clearInterval(poll)
+          setImporting(null)
+          load()
+          if (log.status === 'success') {
+            notify('ok', `Import klaar — ${log.imported} nieuw, ${log.updated} bijgewerkt.`)
+          } else {
+            notify('err', 'Import mislukt. Zie logs voor details.')
+          }
+        }
+      } catch {
+        // ignore tijdelijke netwerkfouten
+      }
+    }, 1000)
   }
 
   const handlePreview = async (id: string) => {
@@ -260,7 +297,7 @@ export default function FeedPage() {
               <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                 <button onClick={() => handleImport(c._id)} disabled={importing === c._id}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                  {importing === c._id ? 'Bezig…' : '▶ Importeren'}
+                  {importing === c._id ? 'Importeren…' : '▶ Importeren'}
                 </button>
                 <button onClick={() => handlePreview(c._id)} disabled={previewing === c._id}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors">
@@ -284,6 +321,33 @@ export default function FeedPage() {
                 </button>
               </div>
             </div>
+
+            {/* Importvoortgang */}
+            {importing === c._id && importProgress?.feedId === c._id && (
+              <div className="mt-3 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                <div className="flex items-center justify-between text-xs text-blue-700 mb-1.5">
+                  <span className="font-medium">Importeren…</span>
+                  <span>
+                    {importProgress.totalInFeed > 0
+                      ? `${importProgress.imported + importProgress.updated + importProgress.skipped} / ${importProgress.totalInFeed}`
+                      : `${importProgress.imported + importProgress.updated + importProgress.skipped} verwerkt`}
+                  </span>
+                </div>
+                {importProgress.totalInFeed > 0 && (
+                  <div className="w-full bg-blue-100 rounded-full h-1.5">
+                    <div
+                      className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
+                      style={{ width: `${Math.min(100, Math.round(((importProgress.imported + importProgress.updated + importProgress.skipped) / importProgress.totalInFeed) * 100))}%` }}
+                    />
+                  </div>
+                )}
+                <div className="flex gap-3 mt-1.5 text-xs text-blue-600">
+                  <span>{importProgress.imported} nieuw</span>
+                  <span>{importProgress.updated} bijgewerkt</span>
+                  {importProgress.skipped > 0 && <span>{importProgress.skipped} overgeslagen</span>}
+                </div>
+              </div>
+            )}
 
             {/* Preview resultaat */}
             {previewData[c._id] && (

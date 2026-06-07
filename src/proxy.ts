@@ -9,6 +9,8 @@ const PUBLIC_API = [
   /^\/api\/setup$/,                           // eenmalige bootstrap
   /^\/api\/cart$/,                            // add-to-cart proxy
   /^\/api\/cron$/,                            // geplande imports (eigen auth via CRON_SECRET)
+  /^\/api\/email-results$/,                  // mail mij de resultaten
+  /^\/api\/trusted-shops$/,                  // Trusted Shops reviews proxy
   /^\/api\/flows\/[^/]+\/match$/,             // widget match
   /^\/api\/flows\/[^/]+$/,                    // widget flow lezen (GET only)
 ]

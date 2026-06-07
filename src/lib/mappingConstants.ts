@@ -13,6 +13,7 @@ export interface FieldMapping {
   ean: string
   sku: string
   category: string
+  qtyIncrement: string
 }
 
 export const DEFAULT_MAPPING: FieldMapping = {
@@ -30,6 +31,7 @@ export const DEFAULT_MAPPING: FieldMapping = {
   ean: 'gtin',
   sku: 'mpn',
   category: 'product_type',
+  qtyIncrement: 'qty_increments',
 }
 
 export const FIELD_LABELS: Record<keyof FieldMapping, string> = {
@@ -47,4 +49,5 @@ export const FIELD_LABELS: Record<keyof FieldMapping, string> = {
   ean: 'EAN / GTIN',
   sku: 'SKU / MPN',
   category: 'Categorie',
+  qtyIncrement: 'Verkoophoeveelheid (per X)',
 }

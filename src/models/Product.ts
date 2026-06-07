@@ -15,6 +15,10 @@ export interface IProduct extends Document {
   ean: string
   sku: string
   category: string
+  qtyIncrement: number
+  shownCount: number
+  clickCount: number
+  cartCount: number
   attributes: Record<string, string>
   createdAt: Date
   updatedAt: Date
@@ -36,6 +40,10 @@ const ProductSchema = new Schema<IProduct>(
     ean: { type: String, default: '' },
     sku: { type: String, default: '' },
     category: { type: String, default: '' },
+    qtyIncrement: { type: Number, default: 1 },
+    shownCount: { type: Number, default: 0 },
+    clickCount: { type: Number, default: 0 },
+    cartCount: { type: Number, default: 0 },
     attributes: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }

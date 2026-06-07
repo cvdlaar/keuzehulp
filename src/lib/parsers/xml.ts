@@ -15,6 +15,7 @@ export interface ParsedProduct {
   ean: string
   sku: string
   category: string
+  qtyIncrement: number
   attributes: Record<string, string>
 }
 

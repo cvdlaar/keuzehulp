@@ -2,14 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { connectDB } from '@/lib/db'
 import User from '@/models/User'
+import { getSession } from '@/lib/auth'
+
+async function requireAdmin() {
+  const session = await getSession()
+  if (!session || session.role !== 'admin') return false
+  return true
+}
 
 export async function GET() {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Geen toegang.' }, { status: 403 })
   await connectDB()
   const users = await User.find().select('-passwordHash').sort({ createdAt: -1 }).lean()
   return NextResponse.json(users)
 }
 
 export async function POST(req: NextRequest) {
+  if (!(await requireAdmin())) return NextResponse.json({ error: 'Geen toegang.' }, { status: 403 })
   await connectDB()
   const { name, email, password, role } = await req.json()
 
@@ -27,7 +36,7 @@ export async function POST(req: NextRequest) {
     name,
     email: email.toLowerCase(),
     passwordHash,
-    role: role === 'keyuser' ? 'keyuser' : 'user',
+    role: ['keyuser', 'admin'].includes(role) ? role : 'user',
   })
 
   return NextResponse.json(

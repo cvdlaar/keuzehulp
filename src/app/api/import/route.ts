@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runImport } from '@/lib/importer'
+import { startImport } from '@/lib/importer'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const logId = await runImport(feedConfigId)
-    return NextResponse.json({ success: true, logId })
+    const logId = await startImport(feedConfigId)
+    return NextResponse.json({ logId })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Import mislukt' },

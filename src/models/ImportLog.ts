@@ -1,5 +1,12 @@
 import mongoose, { Schema, Document, Types } from 'mongoose'
 
+export interface MappingDiagnosticEntry {
+  internalField: string
+  feedKey: string
+  found: boolean
+  sample: string
+}
+
 export interface IImportLog extends Document {
   feedConfigId: Types.ObjectId
   feedName: string
@@ -9,6 +16,9 @@ export interface IImportLog extends Document {
   updated: number
   skipped: number
   importErrors: string[]
+  mappingDiagnostics: MappingDiagnosticEntry[]
+  rawKeys: string[]
+  attributeSample: Record<string, string>
   startedAt: Date
   completedAt: Date | null
 }
@@ -22,6 +32,9 @@ const ImportLogSchema = new Schema<IImportLog>({
   updated: { type: Number, default: 0 },
   skipped: { type: Number, default: 0 },
   importErrors: [{ type: String }],
+  mappingDiagnostics: { type: Schema.Types.Mixed, default: [] },
+  rawKeys: { type: [String], default: [] },
+  attributeSample: { type: Schema.Types.Mixed, default: {} },
   startedAt: { type: Date, default: Date.now },
   completedAt: { type: Date, default: null },
 })

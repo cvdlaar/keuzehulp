@@ -15,8 +15,8 @@ export async function login(prevState: LoginState, formData: FormData): Promise<
 
   // Dev-bypass: werkt alleen lokaal (nooit in productie)
   if (process.env.NODE_ENV === 'development' && email === 'admin' && password === 'admin') {
-    await createSession('dev', 'keyuser')
-    redirect('/beheer/flows')
+    await createSession('dev', 'admin')
+    redirect('/')
   }
 
   await connectDB()

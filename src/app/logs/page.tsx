@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from 'react'
 
+interface MappingDiagnostic {
+  internalField: string
+  feedKey: string
+  found: boolean
+  sample: string
+}
+
 interface ImportLog {
   _id: string
   feedName: string
@@ -11,6 +18,9 @@ interface ImportLog {
   updated: number
   skipped: number
   importErrors: string[]
+  mappingDiagnostics: MappingDiagnostic[]
+  rawKeys: string[]
+  attributeSample: Record<string, string>
   startedAt: string
   completedAt: string | null
 }
@@ -103,6 +113,72 @@ export default function LogsPage() {
                       <li className="text-xs text-red-400">…en {log.importErrors.length - 10} meer</li>
                     )}
                   </ul>
+                </div>
+              )}
+
+              {log.mappingDiagnostics?.length > 0 && (
+                <div className="mt-3 border border-gray-100 rounded-lg overflow-hidden">
+                  <p className="text-xs font-semibold text-gray-600 px-3 py-2 bg-gray-50 border-b border-gray-100">
+                    Mapping-check (eerste product)
+                  </p>
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr className="text-left text-gray-500">
+                        <th className="px-3 py-1.5 font-medium">Intern veld</th>
+                        <th className="px-3 py-1.5 font-medium">Feed-sleutel</th>
+                        <th className="px-3 py-1.5 font-medium w-16">Status</th>
+                        <th className="px-3 py-1.5 font-medium">Voorbeeldwaarde</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {log.mappingDiagnostics.map((d) => (
+                        <tr key={d.internalField} className={d.found ? '' : 'bg-red-50'}>
+                          <td className="px-3 py-1.5 font-mono text-gray-700">{d.internalField}</td>
+                          <td className="px-3 py-1.5 font-mono text-blue-600">{d.feedKey || '—'}</td>
+                          <td className="px-3 py-1.5">
+                            {d.feedKey ? (
+                              d.found
+                                ? <span className="text-green-600 font-medium">✓</span>
+                                : <span className="text-red-500 font-medium">✗ niet gevonden</span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-1.5 text-gray-500 max-w-48 truncate">{d.sample || <span className="text-gray-300 italic">leeg</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {log.rawKeys?.length > 0 && (
+                    <div className="px-3 py-2 bg-gray-50 border-t border-gray-100">
+                      <p className="text-xs text-gray-500 mb-1 font-medium">Alle sleutels in feed ({log.rawKeys.length}):</p>
+                      <div className="flex flex-wrap gap-1">
+                        {log.rawKeys.map(k => (
+                          <span key={k} className="px-1.5 py-0.5 bg-white border border-gray-200 rounded font-mono text-gray-600">{k}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {log.attributeSample && Object.keys(log.attributeSample).length > 0 && (
+                    <div className="px-3 py-2 bg-amber-50 border-t border-amber-100">
+                      <p className="text-xs text-amber-700 mb-2 font-medium">Ongemapte velden (eerste product) — worden opgeslagen als attribuut als niet leeg:</p>
+                      <table className="w-full text-xs">
+                        <tbody className="divide-y divide-amber-100">
+                          {Object.entries(log.attributeSample).map(([k, v]) => (
+                            <tr key={k}>
+                              <td className="py-1 pr-3 font-mono text-gray-600 w-48 align-top">{k}</td>
+                              <td className="py-1">
+                                {v
+                                  ? <span className="text-gray-700">{v}</span>
+                                  : <span className="text-red-400 italic">leeg — wordt niet opgeslagen</span>
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

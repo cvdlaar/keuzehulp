@@ -5,6 +5,7 @@ export type EventType =
   | 'answer_selected'
   | 'results_shown'
   | 'no_results'
+  | 'product_shown'
   | 'product_click'
   | 'add_to_cart'
 
@@ -22,7 +23,7 @@ const EventSchema = new Schema<IEvent>(
     sessionId: { type: String, required: true },
     type: {
       type: String,
-      enum: ['question_shown', 'answer_selected', 'results_shown', 'no_results', 'product_click', 'add_to_cart'],
+      enum: ['question_shown', 'answer_selected', 'results_shown', 'no_results', 'product_shown', 'product_click', 'add_to_cart'],
       required: true,
     },
     data: { type: Schema.Types.Mixed, default: {} },

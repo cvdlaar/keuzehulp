@@ -16,18 +16,17 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/flows/[id]'>
   const body = await req.json()
 
   // Volledige flow-update: de client stuurt het hele flow-object terug
-  const { name, description, startQuestionId, questions, active, boostConfig, adobeCommerceUrl } = body
-
   const update: Record<string, unknown> = {}
-  if (name !== undefined) update.name = name
-  if (description !== undefined) update.description = description
-  if (startQuestionId !== undefined) update.startQuestionId = startQuestionId
-  if (questions !== undefined) update.questions = questions
-  if (active !== undefined) update.active = active
-  if (boostConfig !== undefined) update.boostConfig = boostConfig
-  if (adobeCommerceUrl !== undefined) update.adobeCommerceUrl = adobeCommerceUrl
+  const fields = [
+    'name','description','startQuestionId','questions','active','boostConfig',
+    'adobeCommerceUrl','widgetStyle','widgetBehavior','emailResults','emailSubject',
+    'spotlerAttributes','resultsSummaryTemplate','displayAttributes',
+  ]
+  for (const f of fields) {
+    if (body[f] !== undefined) update[f] = body[f]
+  }
 
-  const flow = await Flow.findByIdAndUpdate(id, update, { new: true })
+  const flow = await Flow.findByIdAndUpdate(id, { $set: update }, { new: true }).lean()
   if (!flow) return NextResponse.json({ error: 'Niet gevonden' }, { status: 404 })
   return NextResponse.json(flow)
 }

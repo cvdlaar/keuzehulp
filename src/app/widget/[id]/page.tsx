@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
@@ -6,10 +6,13 @@ import { useParams } from 'next/navigation'
 interface Answer {
   id: string
   text: string
+  label?: string
+  info?: string
   imageUrl: string
   nextQuestionId: string | null
-  matchRules: { field: string; operator: string; value: string }[]
+  matchRules: { field: string; operator: 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'gt' | 'gte' | 'lt' | 'lte'; value: string }[]
   pinnedProductIds: string[]
+  maatwerkMode?: boolean
 }
 
 type AnswerLayout = 'text' | 'image' | 'image-text' | 'size'
@@ -17,9 +20,23 @@ type AnswerLayout = 'text' | 'image' | 'image-text' | 'size'
 interface Question {
   id: string
   text: string
-  type: 'single' | 'multi'
+  intro?: string
+  type: 'single' | 'multi' | 'range'
   layout: AnswerLayout
   answers: Answer[]
+  rangeField?: string
+  rangeUnit?: string
+  rangeMin?: number
+  rangeMax?: number
+  rangeStep?: number
+  rangeStrictFilter?: boolean
+  rangeNextQuestionId?: string | null
+}
+
+interface WidgetStyle {
+  primaryColor: string
+  borderRadius: 'none' | 'small' | 'medium' | 'large'
+  fontFamily: string
 }
 
 interface Flow {
@@ -29,6 +46,24 @@ interface Flow {
   startQuestionId: string
   questions: Question[]
   adobeCommerceUrl?: string
+  widgetStyle?: WidgetStyle
+  emailResults?: boolean
+  emailSubject?: string
+  spotlerAttributes?: Record<string, string>
+  resultsSummaryTemplate?: string
+  resultsTitle?: string
+  displayAttributes?: string[]
+  maatwerkTitle?: string
+  maatwerkIntro?: string
+  maatwerkFields?: MaatwerkField[]
+  maatwerkIncludeAddress?: boolean
+  widgetBehavior?: {
+    enableAnimations: boolean
+    rememberAnswers: boolean
+    progressStyle: 'bar' | 'steps'
+    showProductReviews: boolean
+    showShopRating: boolean
+  }
 }
 
 interface RuleResult {
@@ -37,6 +72,7 @@ interface RuleResult {
   value: string
   matched: boolean
   productValue: string
+  answerId: string
 }
 
 interface ScoredProduct {
@@ -66,38 +102,49 @@ interface MatchResponse {
   perfect: ScoredProduct[]
   alternatives: ScoredProduct[]
   searchCriteria: string[]
+  related: ScoredProduct[]
 }
 
-type Phase = 'loading' | 'question' | 'results' | 'error'
+type Phase = 'loading' | 'question' | 'results' | 'maatwerk' | 'maatwerk-done' | 'error'
 
-const OPERATOR_NL: Record<string, string> = {
-  contains: 'bevat',
-  notContains: 'bevat niet',
-  equals: 'is',
-  startsWith: 'begint met',
-}
-
-const FIELD_NL: Record<string, string> = {
-  category: 'Categorie',
-  brand: 'Merk',
-  title: 'Titel',
-  availability: 'Beschikbaarheid',
+interface MaatwerkField {
+  id: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'file'
+  required: boolean
+  placeholder: string
 }
 
 // ── Layout-helpers ───────────────────────────────────────────────────────────
 
-function answerWrapperClass(layout: AnswerLayout) {
-  if (layout === 'image') return 'grid grid-cols-2 gap-3'
+function answerWrapperClass(layout: AnswerLayout, cols = 2) {
+  if (layout === 'image') return `grid gap-3`
   if (layout === 'size')  return 'flex flex-wrap gap-2'
   return 'space-y-3'
 }
 
+function answerWrapperStyle(layout: AnswerLayout, cols = 2): React.CSSProperties {
+  if (layout === 'image') return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
+  return {}
+}
+
 function singleBtnClass(layout: AnswerLayout, active = false) {
   const base = 'transition-all font-medium text-sm border-2 '
-  if (layout === 'image')      return base + 'rounded-xl overflow-hidden flex flex-col ' + (active ? 'border-blue-500' : 'border-gray-200 hover:border-blue-400')
-  if (layout === 'image-text') return base + 'w-full text-left rounded-xl flex items-center gap-3 p-3 ' + (active ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200 hover:border-blue-400 text-gray-800')
-  if (layout === 'size')       return base + 'rounded-lg px-4 py-2 ' + (active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-blue-400 text-gray-700')
-  return base + 'w-full text-left px-5 py-4 rounded-xl flex items-center gap-3 ' + (active ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200 hover:border-blue-400 text-gray-800')
+  if (layout === 'image')      return base + 'overflow-hidden flex flex-col ' + (active ? '' : 'border-gray-200')
+  if (layout === 'image-text') return base + 'w-full text-left flex items-center gap-3 p-3 ' + (active ? '' : 'border-gray-200 text-gray-800')
+  if (layout === 'size')       return base + 'px-4 py-2 ' + (active ? '' : 'border-gray-200 text-gray-700')
+  return base + 'w-full text-left px-5 py-4 flex items-center gap-3 ' + (active ? '' : 'border-gray-200 text-gray-800')
+}
+
+function singleBtnStyle(active: boolean, khRadius: string): React.CSSProperties {
+  return {
+    borderRadius: khRadius,
+    ...(active ? {
+      borderColor: 'var(--kh)',
+      backgroundColor: 'color-mix(in srgb, var(--kh) 10%, white)',
+      color: 'var(--kh)',
+    } : {}),
+  }
 }
 
 function AnswerContent({ a, layout }: { a: Answer; layout: AnswerLayout }) {
@@ -128,29 +175,312 @@ function AnswerContent({ a, layout }: { a: Answer; layout: AnswerLayout }) {
   )
 }
 
+// ── Maatwerk formulier ───────────────────────────────────────────────────────
+
+function MaatwerkFormView({ flowId, flow, answerId, selections, khRadius, done, onSubmitDone, onBack }: {
+  flowId: string
+  flow: Flow
+  answerId: string
+  selections: { questionText: string; answerText: string }[]
+  khRadius: string
+  done: boolean
+  onSubmitDone: () => void
+  onBack: () => void
+}) {
+  const fields = flow.maatwerkFields ?? []
+  const includeAddress = flow.maatwerkIncludeAddress ?? false
+  const title = flow.maatwerkTitle || 'Aanvraag indienen'
+  const intro = flow.maatwerkIntro || ''
+
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [fileMap, setFileMap] = useState<Record<string, { name: string; url: string }>>({})
+  const [uploading, setUploading] = useState<Record<string, boolean>>({})
+  const [contact, setContact] = useState({ naam: '', email: '', telefoon: '', straat: '', postcode: '', plaats: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const uploadFile = async (fieldId: string, file: File) => {
+    setUploading(u => ({ ...u, [fieldId]: true }))
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch('/api/upload', { method: 'POST', body: form })
+    setUploading(u => ({ ...u, [fieldId]: false }))
+    if (res.ok) {
+      const { url } = await res.json()
+      setFileMap(m => ({ ...m, [fieldId]: { name: file.name, url } }))
+    }
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!contact.email) { setError('E-mailadres is verplicht.'); return }
+    setSubmitting(true)
+    const submitFields = fields
+      .filter(f => f.type !== 'file')
+      .map(f => ({ label: f.label, type: f.type, value: values[f.id] ?? '' }))
+    const submitFiles = fields
+      .filter(f => f.type === 'file' && fileMap[f.id])
+      .map(f => ({ label: f.label, filename: fileMap[f.id].name, url: fileMap[f.id].url }))
+    const res = await fetch('/api/maatwerk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flowId, answerId, selections, fields: submitFields, files: submitFiles, contact }),
+    })
+    setSubmitting(false)
+    if (res.ok) { onSubmitDone() } else { setError('Verzenden mislukt. Probeer het opnieuw.') }
+  }
+
+  if (done) return (
+    <div className="text-center py-10 space-y-4">
+      <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--kh) 15%, white)' }}>
+        ✓
+      </div>
+      <h2 className="text-xl font-bold text-gray-900">Aanvraag ontvangen!</h2>
+      <p className="text-sm text-gray-500">We nemen zo snel mogelijk contact met je op.</p>
+      <button onClick={onBack} className="text-xs text-gray-400 hover:text-gray-600 transition-colors mt-4">
+        ← Opnieuw beginnen
+      </button>
+    </div>
+  )
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      {/* Titel + intro */}
+      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+      {intro && <p className="text-sm text-gray-500 leading-relaxed">{intro}</p>}
+
+      {/* Samenvatting gemaakte keuzes */}
+      {selections.length > 0 && (
+        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Jouw keuzes</p>
+          <dl className="space-y-1.5">
+            {selections.map((s, i) => (
+              <div key={i} className="flex gap-2 text-sm">
+                <dt className="text-gray-400 shrink-0 w-2/5 truncate">{s.questionText}</dt>
+                <dd className="font-medium text-gray-700">{s.answerText}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {/* Inhoudelijke velden */}
+      {fields.map(f => (
+        <div key={f.id}>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}
+          </label>
+          {f.type === 'textarea' ? (
+            <textarea
+              required={f.required}
+              placeholder={f.placeholder}
+              value={values[f.id] ?? ''}
+              onChange={e => setValues(v => ({ ...v, [f.id]: e.target.value }))}
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              style={{ '--tw-ring-color': 'var(--kh)' } as React.CSSProperties}
+            />
+          ) : f.type === 'file' ? (
+            <div>
+              <input
+                type="file"
+                onChange={e => { const file = e.target.files?.[0]; if (file) uploadFile(f.id, file) }}
+                className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+              />
+              {uploading[f.id] && <p className="text-xs text-gray-400 mt-1">Uploaden…</p>}
+              {fileMap[f.id] && <p className="text-xs text-green-600 mt-1">✓ {fileMap[f.id].name}</p>}
+            </div>
+          ) : (
+            <input
+              type={f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : f.type === 'phone' ? 'tel' : 'text'}
+              required={f.required}
+              placeholder={f.placeholder}
+              value={values[f.id] ?? ''}
+              onChange={e => setValues(v => ({ ...v, [f.id]: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              style={{ '--tw-ring-color': 'var(--kh)' } as React.CSSProperties}
+            />
+          )}
+        </div>
+      ))}
+
+      {/* Contactgegevens */}
+      <div className="pt-4 mt-2 border-t border-gray-100">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Contactgegevens</p>
+        <div className="space-y-3">
+          {[
+            { key: 'naam',     label: 'Naam',          type: 'text',  required: true },
+            { key: 'email',    label: 'E-mailadres',    type: 'email', required: true },
+            { key: 'telefoon', label: 'Telefoonnummer', type: 'tel',   required: false },
+          ].map(({ key, label, type, required }) => (
+            <div key={key}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+              </label>
+              <input
+                type={type} required={required}
+                value={contact[key as keyof typeof contact]}
+                onChange={e => setContact(c => ({ ...c, [key]: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                style={{ '--tw-ring-color': 'var(--kh)' } as React.CSSProperties}
+              />
+            </div>
+          ))}
+          {includeAddress && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Straat + huisnummer</label>
+                <input type="text" value={contact.straat}
+                  onChange={e => setContact(c => ({ ...c, straat: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': 'var(--kh)' } as React.CSSProperties}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
+                  <input type="text" value={contact.postcode}
+                    onChange={e => setContact(c => ({ ...c, postcode: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': 'var(--kh)' } as React.CSSProperties}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Plaats</label>
+                  <input type="text" value={contact.plaats}
+                    onChange={e => setContact(c => ({ ...c, plaats: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': 'var(--kh)' } as React.CSSProperties}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full py-3 text-white font-medium text-sm disabled:opacity-50 transition-colors"
+        style={{ backgroundColor: 'var(--kh)', borderRadius: khRadius }}
+      >
+        {submitting ? 'Verzenden…' : 'Aanvraag versturen'}
+      </button>
+      <button type="button" onClick={onBack} className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
+        ← Terug
+      </button>
+    </form>
+  )
+}
+
+// ── Range invoer (slider + getal, gesynchroniseerd) ─────────────────────────
+
+function RangeInput({ question, value, onChange, onConfirm, khRadius }: {
+  question: Question
+  value: string | undefined
+  onChange: (v: string) => void
+  onConfirm: () => void
+  khRadius: string
+}) {
+  const min  = question.rangeMin  ?? 0
+  const max  = question.rangeMax  ?? 1000
+  const step = question.rangeStep ?? 1
+  const unit = question.rangeUnit ?? ''
+  const defaultVal = Math.round((min + max) / 2 / step) * step
+  const numValue = value !== undefined && value !== '' ? parseFloat(value) : defaultVal
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-5">
+        <input
+          type="number"
+          min={min} max={max} step={step}
+          value={numValue}
+          onChange={e => onChange(e.target.value)}
+          className="w-28 border-2 rounded-xl px-3 py-2 text-xl font-bold text-center focus:outline-none"
+          style={{ borderColor: 'var(--kh)', color: 'var(--kh)' }}
+        />
+        {unit && <span className="text-gray-500 text-base">{unit}</span>}
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step}
+        value={numValue}
+        onChange={e => onChange(e.target.value)}
+        className="w-full mb-2"
+        style={{ accentColor: 'var(--kh)' }}
+      />
+      <div className="flex justify-between text-xs text-gray-400 mb-6">
+        <span>{min}{unit ? ` ${unit}` : ''}</span>
+        <span>{max}{unit ? ` ${unit}` : ''}</span>
+      </div>
+      <button
+        onClick={onConfirm}
+        className="w-full py-3 text-white font-medium text-sm transition-colors"
+        style={{ backgroundColor: 'var(--kh)', borderRadius: khRadius }}
+      >
+        Volgende →
+      </button>
+    </div>
+  )
+}
+
 function AnswerList({
   question,
   selectedAnswers,
   onSelectSingle,
   onToggleMulti,
   onConfirmMulti,
+  khRadius,
 }: {
   question: Question
   selectedAnswers: Record<string, string | string[]>
   onSelectSingle: (a: Answer) => void
   onToggleMulti: (id: string) => void
   onConfirmMulti: () => void
+  khRadius: string
 }) {
   const layout = question.layout ?? 'text'
-  const wrapperClass = answerWrapperClass(layout)
+  const cols = (question as Question & { imageColumns?: number }).imageColumns ?? 2
+  const wrapperClass = answerWrapperClass(layout, cols)
+  const wrapperStyle = answerWrapperStyle(layout, cols)
+  const [infoOpen, setInfoOpen] = useState<string | null>(null)
 
   if (question.type === 'single') {
     return (
-      <div className={wrapperClass}>
+      <div className={wrapperClass} style={wrapperStyle}>
         {question.answers.map(a => (
-          <button key={a.id} onClick={() => onSelectSingle(a)} className={singleBtnClass(layout)}>
-            <AnswerContent a={a} layout={layout} />
-          </button>
+          <div key={a.id} className="relative">
+            <button onClick={() => onSelectSingle(a)}
+              className={singleBtnClass(layout)}
+              style={singleBtnStyle(false, khRadius)}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--kh)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
+            >
+              <AnswerContent a={a} layout={layout} />
+            </button>
+            {a.info && (
+              <>
+                <button
+                  onClick={e => { e.stopPropagation(); setInfoOpen(infoOpen === a.id ? null : a.id) }}
+                  className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-50 border border-amber-200 text-amber-500 text-xs font-semibold flex items-center justify-center hover:bg-amber-100 z-10 leading-none"
+                  title="Meer informatie"
+                >
+                  i
+                </button>
+                {infoOpen === a.id && (
+                  <div className="absolute right-0 top-9 z-20 bg-white border border-amber-200 rounded-lg shadow-lg text-xs text-amber-800 p-3 w-64 text-left">
+                    {a.info}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         ))}
       </div>
     )
@@ -161,30 +491,142 @@ function AnswerList({
   return (
     <div>
       <p className="text-xs text-gray-400 mb-3">Selecteer alles wat van toepassing is.</p>
-      <div className={wrapperClass}>
+      <div className={wrapperClass} style={wrapperStyle}>
         {question.answers.map(a => {
           const selected = chosen.includes(a.id)
           return (
-            <button key={a.id} onClick={() => onToggleMulti(a.id)}
-              className={singleBtnClass(layout, selected) + (layout === 'text' || layout === 'image-text' ? ' relative' : '')}>
-              {(layout === 'text' || layout === 'image-text') && (
-                <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
-                  {selected && <span className="text-white text-xs">✓</span>}
-                </span>
+            <div key={a.id} className="relative">
+              <button onClick={() => onToggleMulti(a.id)}
+                className={singleBtnClass(layout, selected) + (layout === 'text' || layout === 'image-text' ? ' relative' : '')}
+                style={singleBtnStyle(selected, khRadius)}>
+                {(layout === 'text' || layout === 'image-text') && (
+                  <span className="w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors"
+                    style={selected ? { borderColor: 'var(--kh)', backgroundColor: 'var(--kh)', color: 'white' } : { borderColor: '#d1d5db' }}>
+                    {selected && <span className="text-xs">✓</span>}
+                  </span>
+                )}
+                {layout === 'size' && selected && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-xs flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--kh)' }}>✓</span>
+                )}
+                <AnswerContent a={a} layout={layout} />
+              </button>
+              {a.info && (
+                <>
+                  <button
+                    onClick={e => { e.stopPropagation(); setInfoOpen(infoOpen === a.id ? null : a.id) }}
+                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-50 border border-amber-200 text-amber-500 text-xs font-semibold flex items-center justify-center hover:bg-amber-100 z-10 leading-none"
+                    title="Meer informatie"
+                  >
+                    i
+                  </button>
+                  {infoOpen === a.id && (
+                    <div className="absolute right-0 top-9 z-20 bg-white border border-amber-200 rounded-lg shadow-lg text-xs text-amber-800 p-3 w-64 text-left">
+                      {a.info}
+                    </div>
+                  )}
+                </>
               )}
-              {layout === 'size' && selected && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">✓</span>
-              )}
-              <AnswerContent a={a} layout={layout} />
-            </button>
+            </div>
           )
         })}
       </div>
       <button onClick={onConfirmMulti}
         disabled={!chosen.length}
-        className="mt-5 w-full py-3 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700 disabled:opacity-40 transition-colors">
+        className="mt-5 w-full py-3 text-white font-medium text-sm disabled:opacity-40 transition-colors"
+        style={{ backgroundColor: 'var(--kh)', borderRadius: khRadius }}>
         Volgende →
       </button>
+    </div>
+  )
+}
+
+// ── Sterren component ────────────────────────────────────────────────────────
+
+function Stars({ rating, count }: { rating: number; count?: number }) {
+  const full  = Math.floor(rating)
+  const half  = rating - full >= 0.25 && rating - full < 0.75
+  const stars = Array.from({ length: 5 }, (_, i) => {
+    if (i < full) return 'full'
+    if (i === full && half) return 'half'
+    return 'empty'
+  })
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex">
+        {stars.map((s, i) => (
+          <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill={s === 'empty' ? 'none' : s === 'half' ? 'url(#half)' : 'currentColor'} stroke="currentColor" strokeWidth="1.5" className="text-yellow-400">
+            {s === 'half' && <defs><linearGradient id="half"><stop offset="50%" stopColor="currentColor"/><stop offset="50%" stopColor="transparent"/></linearGradient></defs>}
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+          </svg>
+        ))}
+      </div>
+      <span className="text-xs text-gray-500">{rating.toFixed(1)}{count ? ` (${count})` : ''}</span>
+    </div>
+  )
+}
+
+// ── Mail mij de resultaten ───────────────────────────────────────────────────
+
+interface EmailProduct {
+  title: string; brand: string; imageLink: string; link: string
+  price: number; salePrice: number | null; lowestPrice: number | null
+}
+
+function EmailResultsForm({ flow, products, khRadius }: {
+  flow: Flow; products: EmailProduct[]; khRadius: string
+}) {
+  const [email, setEmail] = useState('')
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
+    setStatus('sending')
+    const res = await fetch('/api/email-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        flowName: flow.name,
+        emailSubject: flow.emailSubject || '',
+        products,
+        primaryColor: flow.widgetStyle?.primaryColor ?? '#2563eb',
+      }),
+    })
+    setStatus(res.ok ? 'sent' : 'error')
+  }
+
+  if (status === 'sent') return (
+    <div className="mt-8 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 text-center">
+      ✓ Aanbevelingen zijn verstuurd naar {email}
+    </div>
+  )
+
+  return (
+    <div className="mt-8 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+      <p className="text-sm font-medium text-gray-800 mb-3">Mail mij de resultaten</p>
+      <form onSubmit={send} className="flex gap-2">
+        <input
+          type="email" required
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="jouw@emailadres.nl"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white"
+          style={{ '--tw-ring-color': 'var(--kh)' } as React.CSSProperties}
+        />
+        <button
+          type="submit"
+          disabled={status === 'sending'}
+          className="px-4 py-2 text-sm font-medium text-white disabled:opacity-50 transition-colors"
+          style={{ backgroundColor: 'var(--kh)', borderRadius: khRadius }}
+        >
+          {status === 'sending' ? 'Versturen…' : 'Verstuur'}
+        </button>
+      </form>
+      {status === 'error' && (
+        <p className="mt-2 text-xs text-red-500">Versturen mislukt. Probeer het later opnieuw.</p>
+      )}
     </div>
   )
 }
@@ -201,8 +643,11 @@ export default function WidgetPage() {
   const [history, setHistory] = useState<string[]>([])
   const [matchData, setMatchData] = useState<MatchResponse | null>(null)
   const [matching, setMatching] = useState(false)
-  const [expandedProduct, setExpandedProduct] = useState<string | null>(null)
   const [cartState, setCartState] = useState<Record<string, 'adding' | 'done' | 'error'>>({})
+  const [productReviews, setProductReviews] = useState<Record<string, { rating: number; count: number }>>({})
+  const [shopRating, setShopRating] = useState<{ rating: number; count: number } | null>(null)
+  const [animDir, setAnimDir] = useState<'in' | 'out'>('in')
+  const [maatwerkAnswer, setMaatwerkAnswer] = useState<Answer | null>(null)
 
   const sessionId = useRef(Math.random().toString(36).slice(2) + Date.now().toString(36)).current
 
@@ -242,8 +687,44 @@ export default function WidgetPage() {
       .catch(() => setPhase('error'))
   }, [id])
 
+  const wb = {
+    enableAnimations: true,
+    rememberAnswers: false,
+    progressStyle: 'bar' as const,
+    showProductReviews: true,
+    showShopRating: false,
+    ...(flow?.widgetBehavior ?? {}),
+  }
   const currentQuestion = flow?.questions.find(q => q.id === currentQuestionId)
   const formatPrice = (p: number) => `€ ${p.toFixed(2).replace('.', ',')}`
+
+  // Antwoorden onthouden in localStorage
+  const storageKey = `kh_answers_${id}`
+  useEffect(() => {
+    if (!wb.rememberAnswers || !flow) return
+    const saved = localStorage.getItem(storageKey)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as Record<string, string | string[]>
+        setSelectedAnswers(parsed)
+      } catch { /* ignore */ }
+    }
+  }, [flow, wb.rememberAnswers]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (wb.rememberAnswers) localStorage.setItem(storageKey, JSON.stringify(selectedAnswers))
+  }, [selectedAnswers, wb.rememberAnswers]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Trusted Shops shopbeoordeling laden
+  useEffect(() => {
+    if (!wb.showShopRating) return
+    fetch('/api/trusted-shops?type=shop')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.rating?.overallMark) setShopRating({ rating: d.rating.overallMark, count: d.rating.totalReviewCount ?? 0 })
+      })
+      .catch(() => {})
+  }, [wb.showShopRating]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (currentQuestion && phase === 'question') {
@@ -260,9 +741,14 @@ export default function WidgetPage() {
     })
     const updated = { ...selectedAnswers, [currentQuestionId]: answer.id }
     setSelectedAnswers(updated)
-    if (answer.nextQuestionId === null) {
+    if (answer.maatwerkMode) {
+      track('maatwerk_shown', { answerId: answer.id, answerText: answer.text })
+      setMaatwerkAnswer(answer)
+      setPhase('maatwerk')
+    } else if (answer.nextQuestionId === null) {
       await showResults(updated)
     } else {
+      setAnimDir('in')
       setHistory(h => [...h, currentQuestionId])
       setCurrentQuestionId(answer.nextQuestionId)
     }
@@ -292,8 +778,31 @@ export default function WidgetPage() {
     if (next === null) {
       await showResults(selectedAnswers)
     } else {
+      setAnimDir('in')
       setHistory(h => [...h, currentQuestionId])
       setCurrentQuestionId(next)
+    }
+  }
+
+  const confirmRange = async () => {
+    if (!currentQuestion || currentQuestion.type !== 'range') return
+    const value = selectedAnswers[currentQuestionId] as string | undefined
+    const unitStr = currentQuestion.rangeUnit ? ` ${currentQuestion.rangeUnit}` : ''
+    track('answer_selected', {
+      questionId: currentQuestionId,
+      questionText: currentQuestion.text,
+      answerId: 'range',
+      answerText: `${value ?? ''}${unitStr}`,
+    })
+    const nextId = currentQuestion.rangeNextQuestionId ?? null
+    const updated = { ...selectedAnswers }
+    if (value === undefined || value === '') updated[currentQuestionId] = String(Math.round(((currentQuestion.rangeMin ?? 0) + (currentQuestion.rangeMax ?? 1000)) / 2))
+    if (nextId === null) {
+      await showResults(updated)
+    } else {
+      setAnimDir('in')
+      setHistory(h => [...h, currentQuestionId])
+      setCurrentQuestionId(nextId)
     }
   }
 
@@ -309,16 +818,87 @@ export default function WidgetPage() {
     setMatchData(data)
     setMatching(false)
     const total = data.perfect.length + data.alternatives.length
+
+    // Productreviews ophalen en/of dummy data seeden voor preview
+    if (wb.showProductReviews) {
+      const allProducts = [...data.perfect, ...data.alternatives]
+
+      // Seed deterministische dummy reviews zodat de weergave direct zichtbaar is;
+      // echte Trusted Shops data overschrijft dit zodra het binnenkomt.
+      const dummies: Record<string, { rating: number; count: number }> = {}
+      for (const s of allProducts) {
+        const h = s.product._id.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)
+        dummies[s.product._id] = { rating: +(3.6 + (h % 15) / 10).toFixed(1), count: 12 + (h % 220) }
+      }
+      setProductReviews(dummies)
+
+      // Trusted Shops productreviews ophalen per SKU (overschrijft dummies indien beschikbaar)
+      for (const s of allProducts) {
+        const sku = (s.product as Record<string, unknown>).sku as string | undefined
+        if (!sku) continue
+        fetch(`/api/trusted-shops?type=product&sku=${encodeURIComponent(sku)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (d?.rating && d?.count > 0) {
+              setProductReviews(prev => ({ ...prev, [s.product._id]: { rating: Number(d.rating), count: Number(d.count) } }))
+            }
+          })
+          .catch(() => {})
+      }
+    }
     if (total === 0) {
       track('no_results')
     } else {
       track('results_shown', { perfectCount: data.perfect.length, alternativeCount: data.alternatives.length })
+      // Elk aanbevolen product apart loggen
+      for (const s of [...data.perfect, ...data.alternatives]) {
+        track('product_shown', {
+          productId: s.product._id,
+          productTitle: s.product.title,
+          isPerfect: s.isPerfect ? 1 : 0,
+          score: s.score,
+        })
+      }
+    }
+
+    // Consolidated completed-event: alle voorkeuren als leesbare tekst + Spotler mapping
+    if (flow) {
+      const preferences: Record<string, string> = {}
+      const spotlerData: Record<string, string> = {}
+      const sa = flow.spotlerAttributes ?? {}
+
+      for (const [qId, aIdOrIds] of Object.entries(answers)) {
+        const q = flow.questions.find(x => x.id === qId)
+        if (!q) continue
+        let answerText: string
+        if (q.type === 'range') {
+          const unitStr = q.rangeUnit ? ` ${q.rangeUnit}` : ''
+          answerText = `${aIdOrIds}${unitStr}`
+        } else {
+          const ids = Array.isArray(aIdOrIds) ? aIdOrIds : [aIdOrIds]
+          answerText = ids.map(aid => q.answers.find(a => a.id === aid)?.text ?? aid).join(', ')
+        }
+        preferences[q.text] = answerText
+        if (sa[qId]) spotlerData[sa[qId]] = answerText
+      }
+
+      if (window.parent !== window) {
+        window.parent.postMessage({
+          source: 'keuzehulp',
+          type: 'completed',
+          flowId: id,
+          flowName: flow.name,
+          preferences,
+          spotlerAttributes: Object.keys(spotlerData).length > 0 ? spotlerData : undefined,
+        }, '*')
+      }
     }
   }
 
   const goBack = () => {
     if (!history.length) return
     const prev = history[history.length - 1]
+    setAnimDir('out')
     setHistory(h => h.slice(0, -1))
     setCurrentQuestionId(prev)
     setPhase('question')
@@ -332,7 +912,7 @@ export default function WidgetPage() {
     setCurrentQuestionId(flow.startQuestionId)
     setPhase('question')
     setMatchData(null)
-    setExpandedProduct(null)
+    setMaatwerkAnswer(null)
   }
 
   const progress = flow ? Math.round((history.length / Math.max(flow.questions.length, 1)) * 100) : 0
@@ -344,8 +924,6 @@ export default function WidgetPage() {
   }) {
     const p = s.product
     const key = p._id
-    const isExpanded = expandedProduct === key
-
     return (
       <div className={`rounded-xl border-2 transition-all ${isBestMatch ? 'border-blue-400 bg-white' : isAlternative ? 'border-gray-200 bg-gray-50' : 'border-blue-100 bg-white'}`}>
         {(isBestMatch || isBestPrice) && (
@@ -376,8 +954,47 @@ export default function WidgetPage() {
               {p.title}
             </p>
             {p.brand && <p className="text-xs text-gray-400 mt-0.5">{p.brand}</p>}
-            {p.shortDescription && (
-              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{p.shortDescription}</p>
+            {wb.showProductReviews && productReviews[p._id] && (
+              <div className="mt-1">
+                <Stars rating={productReviews[p._id].rating} count={productReviews[p._id].count} />
+              </div>
+            )}
+            {p.shortDescription && (() => {
+              const liParts = [...p.shortDescription.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+                .map(m => m[1].replace(/<[^>]+>/g, '').trim())
+                .filter(Boolean)
+              if (liParts.length > 0) {
+                return (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {liParts.map((part, i) => (
+                      <span key={i} className="inline-block text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {part}
+                      </span>
+                    ))}
+                  </div>
+                )
+              }
+              const plain = p.shortDescription.replace(/<[^>]+>/g, '').trim()
+              return plain ? (
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{plain}</p>
+              ) : null
+            })()}
+            {/* Extra feedattributen */}
+            {flow?.displayAttributes && flow.displayAttributes.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {flow.displayAttributes.map(attr => {
+                  const val = (p as Record<string, unknown>).attributes
+                    ? ((p as Record<string, unknown>).attributes as Record<string, string>)?.[attr]
+                    : undefined
+                  const directVal = (p as Record<string, unknown>)[attr]
+                  const display = val || (directVal !== undefined ? String(directVal) : '')
+                  return display ? (
+                    <span key={attr} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                      {attr}: {display}
+                    </span>
+                  ) : null
+                })}
+              </div>
             )}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {/* Staffelprijs: lowestPrice is lager dan reguliere prijs */}
@@ -395,6 +1012,11 @@ export default function WidgetPage() {
               ) : p.price > 0 ? (
                 <span className="text-sm font-bold text-gray-800">{formatPrice(p.price)}</span>
               ) : null}
+              {(p.qtyIncrement as number) > 1 && (
+                <span className="text-xs bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-medium">
+                  Per {p.qtyIncrement} stuks
+                </span>
+              )}
               {p.availability === 'in stock' && (
                 <span className="text-xs text-green-600 font-medium">Op voorraad</span>
               )}
@@ -418,15 +1040,21 @@ export default function WidgetPage() {
             setTimeout(() => setCartState(s => { const n = { ...s }; delete n[key]; return n }), 4000)
           }
           return (
-            <div className="px-4 pb-3">
+            <div className="px-4 pb-3 flex justify-end">
               <button
                 onClick={addToCart}
                 disabled={cs === 'done'}
-                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${
-                  cs === 'done' ? 'bg-green-100 text-green-700' :
-                  'bg-blue-600 text-white hover:bg-blue-700'
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                  cs === 'done'
+                    ? 'border-green-200 text-green-600 bg-green-50'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
                 }`}
+                style={{ borderRadius: khRadius }}
               >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                </svg>
                 {cs === 'done' ? '✓ Toegevoegd' : 'In winkelwagen'}
               </button>
             </div>
@@ -434,41 +1062,43 @@ export default function WidgetPage() {
         })()}
 
         {/* Uitlegknop */}
-        {s.ruleResults.length > 0 && (
-          <div className="px-4 pb-3 border-t border-gray-100">
-            <button
-              onClick={() => setExpandedProduct(isExpanded ? null : key)}
-              className="text-xs text-blue-500 hover:underline mt-2"
-            >
-              {isExpanded ? 'Verberg uitleg ▲' : 'Waarom dit product? ▼'}
-            </button>
-
-            {isExpanded && (
-              <div className="mt-3 space-y-1.5">
-                {s.ruleResults.map((r, i) => (
+        {s.ruleResults.length > 0 && flow && (() => {
+          // Groepeer ruleResults per antwoord-ID
+          const byAnswer: Record<string, { text: string; allMatched: boolean }> = {}
+          for (const r of s.ruleResults) {
+            if (!r.answerId) continue
+            if (!byAnswer[r.answerId]) {
+              // Zoek het label op via de flow; valt terug op antwoordtekst
+              let answerText = ''
+              for (const q of flow.questions) {
+                const a = q.answers.find(x => x.id === r.answerId)
+                if (a) { answerText = a.label || a.text; break }
+              }
+              if (!answerText) continue
+              byAnswer[r.answerId] = { text: answerText, allMatched: true }
+            }
+            if (!r.matched) byAnswer[r.answerId].allMatched = false
+          }
+          const reasons = Object.values(byAnswer).sort((a, b) => Number(b.allMatched) - Number(a.allMatched))
+          if (!reasons.length) return null
+          return (
+            <div className="px-4 pb-3 pt-2 border-t border-gray-100">
+              <p className="text-xs font-medium text-gray-500 mb-1.5">Waarom dit product?</p>
+              <div className="space-y-1.5">
+                {reasons.map((r, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className={r.matched ? 'text-green-500' : 'text-red-400'}>
-                      {r.matched ? '✓' : '✗'}
+                    <span className={r.allMatched ? 'text-green-500' : 'text-orange-400'}>
+                      {r.allMatched ? '✓' : '~'}
                     </span>
-                    <span className="text-gray-500">
-                      {FIELD_NL[r.field] ?? r.field} {OPERATOR_NL[r.operator] ?? r.operator}{' '}
-                      <strong>"{r.value}"</strong>
+                    <span className={r.allMatched ? 'text-gray-700' : 'text-gray-400'}>
+                      {r.text}
                     </span>
-                    {!r.matched && r.productValue && (
-                      <span className="text-gray-400">(is: "{r.productValue}")</span>
-                    )}
-                  </div>
-                ))}
-                {s.boostBreakdown.map((b, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-blue-500">
-                    <span>↑</span>
-                    <span>{b.label} +{b.points} punten</span>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )
+        })()}
       </div>
     )
   }
@@ -483,33 +1113,77 @@ export default function WidgetPage() {
     return <div className="flex items-center justify-center min-h-64 text-red-400 text-sm">Keuzehulp niet gevonden.</div>
   }
 
+  const ws = flow?.widgetStyle
+  // URL-params (van de admin preview) overschrijven de opgeslagen stijl
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const khColor  = urlParams?.get('color')  || ws?.primaryColor  || '#2563eb'
+  const khRadius = { none: '0px', small: '6px', medium: '12px', large: '20px' }[
+    (urlParams?.get('radius') || ws?.borderRadius || 'medium') as 'none' | 'small' | 'medium' | 'large'
+  ]
+  const khFont   = urlParams?.get('font')   || ws?.fontFamily   || ''
+
+  // Licht en donker afgeleid van de primaire kleur voor hover/active states
+  const khStyle = {
+    '--kh': khColor,
+    '--kh-r': khRadius,
+    '--kh-font': khFont || 'inherit',
+  } as React.CSSProperties
+
   return (
-    <div className="max-w-xl mx-auto px-4 py-8 font-sans">
-      {/* Voortgangsbalk */}
+    <div className="max-w-xl mx-auto px-4 py-8" style={{ ...khStyle, fontFamily: khFont || undefined }}>
+      <style>{`
+        @keyframes khSlideIn  { from { opacity:0; transform:translateX(28px) } to { opacity:1; transform:none } }
+        @keyframes khSlideOut { from { opacity:0; transform:translateX(-28px) } to { opacity:1; transform:none } }
+      `}</style>
+      {/* Voortgangsindicator */}
       {phase === 'question' && flow && (
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
             <span>{flow.name}</span>
-            <span>Stap {history.length + 1}</span>
+            {wb.progressStyle === 'steps'
+              ? <span className="font-medium" style={{ color: 'var(--kh)' }}>Vraag {history.length + 1} van {flow.questions.length}</span>
+              : <span>Stap {history.length + 1}</span>}
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-1.5">
-            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${Math.max(progress, 5)}%` }} />
-          </div>
+          {wb.progressStyle !== 'steps' && (
+            <div className="w-full bg-gray-100 rounded-full h-1.5">
+              <div className="h-1.5 rounded-full transition-all duration-300" style={{ width: `${Math.max(progress, 5)}%`, backgroundColor: 'var(--kh)' }} />
+            </div>
+          )}
         </div>
       )}
 
       {/* Vraagfase */}
       {phase === 'question' && currentQuestion && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-6 leading-snug">{currentQuestion.text}</h2>
+        <div
+          key={currentQuestionId}
+          className={wb.enableAnimations ? `animate-kh-${animDir}` : ''}
+          style={wb.enableAnimations ? {
+            animation: `${animDir === 'in' ? 'khSlideIn' : 'khSlideOut'} 0.25s ease forwards`,
+          } : undefined}
+        >
+          <h2 className="text-xl font-bold text-gray-900 mb-3 leading-snug">{currentQuestion.text}</h2>
+          {currentQuestion.intro && (
+            <p className="text-sm text-gray-500 mb-5 leading-relaxed">{currentQuestion.intro}</p>
+          )}
 
-          <AnswerList
-            question={currentQuestion}
-            selectedAnswers={selectedAnswers}
-            onSelectSingle={selectSingle}
-            onToggleMulti={toggleMulti}
-            onConfirmMulti={confirmMulti}
-          />
+          {currentQuestion.type === 'range' ? (
+            <RangeInput
+              question={currentQuestion}
+              value={selectedAnswers[currentQuestionId] as string | undefined}
+              onChange={v => setSelectedAnswers(prev => ({ ...prev, [currentQuestionId]: v }))}
+              onConfirm={confirmRange}
+              khRadius={khRadius}
+            />
+          ) : (
+            <AnswerList
+              question={currentQuestion}
+              selectedAnswers={selectedAnswers}
+              onSelectSingle={selectSingle}
+              onToggleMulti={toggleMulti}
+              onConfirmMulti={confirmMulti}
+              khRadius={khRadius}
+            />
+          )}
 
           {history.length > 0 && (
             <button onClick={goBack} className="mt-4 text-xs text-gray-400 hover:text-gray-600 transition-colors">
@@ -519,33 +1193,42 @@ export default function WidgetPage() {
         </div>
       )}
 
+      {/* Maatwerk formulier */}
+      {(phase === 'maatwerk' || phase === 'maatwerk-done') && maatwerkAnswer && flow && (() => {
+        const selections = flow.questions.flatMap(q => {
+          const sel = selectedAnswers[q.id]
+          if (!sel) return []
+          if (q.type === 'range') {
+            const unit = q.rangeUnit ? ` ${q.rangeUnit}` : ''
+            return [{ questionText: q.text, answerText: `${sel}${unit}` }]
+          }
+          const ids = Array.isArray(sel) ? sel : [sel]
+          const texts = ids.map(id => q.answers.find(a => a.id === id)?.text).filter(Boolean) as string[]
+          return texts.length ? [{ questionText: q.text, answerText: texts.join(', ') }] : []
+        })
+        return (
+          <MaatwerkFormView
+            flowId={id}
+            flow={flow}
+            answerId={maatwerkAnswer.id}
+            selections={selections}
+            khRadius={khRadius}
+            done={phase === 'maatwerk-done'}
+            onSubmitDone={() => setPhase('maatwerk-done')}
+            onBack={() => { setPhase('question'); setMaatwerkAnswer(null) }}
+          />
+        )
+      })()}
+
       {/* Resultaten */}
       {phase === 'results' && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              {matching ? 'Zoeken…' : 'Jouw resultaten'}
+              {matching ? 'Zoeken…' : (flow?.resultsTitle || 'Jouw resultaten')}
             </h2>
             <button onClick={restart} className="text-xs text-blue-600 hover:underline">Opnieuw beginnen</button>
           </div>
-
-          {/* Zoekcriteria samenvatting */}
-          {!matching && matchData && matchData.searchCriteria.length > 0 && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5">
-              <p className="text-xs font-semibold text-blue-700 mb-1.5">Je bent op zoek naar:</p>
-              <ul className="space-y-0.5">
-                {matchData.searchCriteria.map((c, i) => {
-                  const [field, ...rest] = c.split(' ')
-                  const fieldNl = FIELD_NL[field] ?? field
-                  return (
-                    <li key={i} className="text-xs text-blue-600">
-                      • {fieldNl} {rest.join(' ')}
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )}
 
           {/* Laadanimatie */}
           {matching && (
@@ -562,6 +1245,22 @@ export default function WidgetPage() {
               <button onClick={restart} className="mt-4 text-sm text-blue-600 hover:underline">Probeer opnieuw</button>
             </div>
           )}
+
+          {/* Dynamische resultaattekst */}
+          {!matching && matchData && flow?.resultsSummaryTemplate && (() => {
+            const tpl = flow.resultsSummaryTemplate
+            const summary = tpl.replace(/\{([^}]+)\}/g, (_: string, qId: string) => {
+              const q = flow.questions.find(x => x.id === qId)
+              if (!q) return ''
+              const aIdOrIds = selectedAnswers[qId]
+              if (!aIdOrIds) return ''
+              const ids = Array.isArray(aIdOrIds) ? aIdOrIds : [aIdOrIds]
+              return ids.map(aid => q.answers.find(a => a.id === aid)?.text ?? '').filter(Boolean).join(', ')
+            })
+            return summary ? (
+              <p className="text-sm text-gray-600 mb-4 italic">{summary}</p>
+            ) : null
+          })()}
 
           {/* Perfect matches + alternatieven met labels */}
           {!matching && matchData && (() => {
@@ -616,6 +1315,69 @@ export default function WidgetPage() {
             <button onClick={goBack} className="mt-5 text-xs text-gray-400 hover:text-gray-600 transition-colors">
               ← Vorige vraag
             </button>
+          )}
+
+          {/* Aanvullende producten (bijverkoop) */}
+          {!matching && matchData && (matchData.related ?? []).length > 0 && (
+            <div className="mt-6 border-t border-gray-100 pt-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Aanvullende producten</p>
+              <div className="space-y-2">
+                {(matchData.related ?? []).map((s, i) => {
+                  const p = s.product as Record<string, string | number>
+                  const price = p.salePrice ? p.salePrice : p.lowestPrice && (p.lowestPrice as number) < (p.price as number) ? p.lowestPrice : p.price
+                  return (
+                    <a
+                      key={i}
+                      href={p.link as string}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => track('product_click', { productId: String(p._id), productTitle: String(p.title) })}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors group"
+                    >
+                      {p.imageLink ? (
+                        <img src={p.imageLink as string} alt="" className="w-12 h-12 object-contain rounded border border-gray-100 shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 line-clamp-1 group-hover:text-gray-900">{p.title as string}</p>
+                        {p.brand ? <p className="text-xs text-gray-400">{p.brand as string}</p> : null}
+                      </div>
+                      {price ? (
+                        <p className="text-sm font-semibold text-gray-700 shrink-0">
+                          € {(price as number).toFixed(2).replace('.', ',')}
+                        </p>
+                      ) : null}
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Mail mij de resultaten */}
+          {!matching && flow?.emailResults && matchData && (matchData.perfect.length + matchData.alternatives.length) > 0 && (
+            <EmailResultsForm
+              flow={flow}
+              products={[...matchData.perfect, ...matchData.alternatives].map(s => ({
+                title: s.product.title,
+                brand: s.product.brand,
+                imageLink: s.product.imageLink,
+                link: s.product.link,
+                price: s.product.price,
+                salePrice: s.product.salePrice,
+                lowestPrice: s.product.lowestPrice,
+              }))}
+              khRadius={khRadius}
+            />
+          )}
+
+          {/* Trusted Shops shopbeoordeling */}
+          {!matching && wb.showShopRating && shopRating && (
+            <div className="mt-6 flex items-center gap-3 justify-center">
+              <Stars rating={shopRating.rating} count={shopRating.count} />
+              <span className="text-xs text-gray-400">shopbeoordeling</span>
+            </div>
           )}
         </div>
       )}

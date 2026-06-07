@@ -21,10 +21,16 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(config, { status: 201 })
 }
 
+const SCHEDULE_INTERVALS: Record<string, number> = {
+  hourly: 60 * 60 * 1000,
+  daily:  24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000,
+}
+
 export async function PUT(req: NextRequest) {
   await connectDB()
   const body = await req.json()
-  const { id, name, url, format, active, fieldMapping } = body
+  const { id, name, url, format, active, fieldMapping, schedule } = body
 
   if (!id) {
     return NextResponse.json({ error: 'ID is verplicht' }, { status: 400 })
@@ -36,6 +42,19 @@ export async function PUT(req: NextRequest) {
   if (format !== undefined) update.format = format
   if (active !== undefined) update.active = active
   if (fieldMapping !== undefined) update.fieldMapping = fieldMapping
+  if (schedule !== undefined) {
+    update.schedule = schedule
+    // Zet nextImportAt als er een schema wordt ingesteld en het nog niet is gepland
+    if (schedule !== 'none') {
+      const existing = await FeedConfig.findById(id).select('nextImportAt').lean()
+      if (!existing?.nextImportAt || existing.nextImportAt < new Date()) {
+        const interval = SCHEDULE_INTERVALS[schedule]
+        if (interval) update.nextImportAt = new Date(Date.now() + interval)
+      }
+    } else {
+      update.nextImportAt = null
+    }
+  }
 
   const config = await FeedConfig.findByIdAndUpdate(id, update, { new: true })
 

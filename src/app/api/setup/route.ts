@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     name,
     email: email.toLowerCase(),
     passwordHash,
-    role: 'keyuser',
+    role: 'admin',
   })
 
   return NextResponse.json(
