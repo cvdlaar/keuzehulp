@@ -10,7 +10,8 @@ export interface MappingDiagnosticEntry {
 export interface IImportLog extends Document {
   feedConfigId: Types.ObjectId
   feedName: string
-  status: 'running' | 'success' | 'error'
+  status: 'running' | 'success' | 'error' | 'cancelled'
+  cancelRequested: boolean
   totalInFeed: number
   imported: number
   updated: number
@@ -26,7 +27,8 @@ export interface IImportLog extends Document {
 const ImportLogSchema = new Schema<IImportLog>({
   feedConfigId: { type: Schema.Types.ObjectId, ref: 'FeedConfig', required: true },
   feedName: { type: String, required: true },
-  status: { type: String, enum: ['running', 'success', 'error'], default: 'running' },
+  status: { type: String, enum: ['running', 'success', 'error', 'cancelled'], default: 'running' },
+  cancelRequested: { type: Boolean, default: false },
   totalInFeed: { type: Number, default: 0 },
   imported: { type: Number, default: 0 },
   updated: { type: Number, default: 0 },

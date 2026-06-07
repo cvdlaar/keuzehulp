@@ -251,6 +251,13 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
 
       // Voortgang na elke batch bijwerken
       await ImportLog.updateOne({ _id: logId }, { imported, updated, skipped })
+
+      // Annulering controleren
+      const current = await ImportLog.findById(logId, { cancelRequested: 1 }).lean()
+      if (current?.cancelRequested) {
+        await ImportLog.updateOne({ _id: logId }, { status: 'cancelled', completedAt: new Date() })
+        return
+      }
     }
 
     await ImportLog.updateOne(

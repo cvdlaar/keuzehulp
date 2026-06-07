@@ -12,7 +12,8 @@ interface MappingDiagnostic {
 interface ImportLog {
   _id: string
   feedName: string
-  status: 'running' | 'success' | 'error'
+  status: 'running' | 'success' | 'error' | 'cancelled'
+  cancelRequested: boolean
   totalInFeed: number
   imported: number
   updated: number
@@ -29,23 +30,44 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<ImportLog[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadLogs = () =>
     fetch('/api/logs?limit=50')
       .then((r) => r.json())
       .then((d) => { setLogs(d); setLoading(false) })
+
+  useEffect(() => {
+    loadLogs()
   }, [])
+
+  // Poll elke 3s zolang er actieve imports zijn
+  useEffect(() => {
+    const hasRunning = logs.some(l => l.status === 'running')
+    if (!hasRunning) return
+    const t = setInterval(loadLogs, 3000)
+    return () => clearInterval(t)
+  }, [logs])
+
+  const cancelLog = async (id: string) => {
+    setCancelling(id)
+    await fetch(`/api/logs/${id}`, { method: 'PATCH' })
+    setCancelling(null)
+    loadLogs()
+  }
 
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
       success: 'bg-green-100 text-green-700',
       error: 'bg-red-100 text-red-700',
       running: 'bg-yellow-100 text-yellow-700',
+      cancelled: 'bg-gray-100 text-gray-500',
     }
     const labels: Record<string, string> = {
       success: 'Geslaagd',
       error: 'Mislukt',
       running: 'Bezig',
+      cancelled: 'Geannuleerd',
     }
     return (
       <span className={`px-2 py-0.5 rounded text-xs font-medium ${map[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -89,6 +111,15 @@ export default function LogsPage() {
             </span>
             <div className="flex items-center gap-3">
               {statusBadge(log.status)}
+              {log.status === 'running' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); cancelLog(log._id) }}
+                  disabled={cancelling === log._id || log.cancelRequested}
+                  className="px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {log.cancelRequested ? 'Stoppen…' : cancelling === log._id ? 'Bezig…' : 'Beëindigen'}
+                </button>
+              )}
               <span className="text-xs text-gray-400">{duration(log)}</span>
               <span className="text-gray-400 text-xs">{expanded === log._id ? '▲' : '▼'}</span>
             </div>
