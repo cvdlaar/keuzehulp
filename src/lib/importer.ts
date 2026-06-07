@@ -35,6 +35,12 @@ function extractString(val: unknown): string {
     if ('#text' in obj) return String(obj['#text'])
     // Atom <link href="..."> element
     if ('_href' in obj) return String(obj['_href'])
+    // Genest element zonder #text — probeer de eerste niet-attribuut waarde recursief
+    for (const [k, v] of Object.entries(obj)) {
+      if (k.startsWith('_')) continue
+      const s = extractString(v)
+      if (s) return s
+    }
   }
   return ''
 }
