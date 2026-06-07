@@ -6,7 +6,7 @@ import Sidebar from './Sidebar'
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isWidget = pathname.startsWith('/widget')
-  const isLogin = pathname === '/login'
+  const isLogin = pathname === '/login' || pathname === '/setup'
 
   if (isWidget || isLogin) {
     return <>{children}</>

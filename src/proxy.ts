@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { decrypt } from '@/lib/session'
 
-const PUBLIC_PREFIXES = ['/login', '/widget', '/_next', '/favicon.ico']
+const PUBLIC_PREFIXES = ['/login', '/setup', '/widget', '/_next', '/favicon.ico']
 
 // API routes die altijd publiek zijn (widget + bootstrap + tracking)
 const PUBLIC_API = [
