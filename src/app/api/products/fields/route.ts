@@ -12,35 +12,31 @@ export async function GET(req: NextRequest) {
   await connectDB()
 
   const detail = new URL(req.url).searchParams.get('detail') === '1'
-  const sample = await Product.find({}, { attributes: 1 }).limit(500).lean()
 
-  const attrKeys = new Set<string>()
-  const attrData: Record<string, { count: number; samples: Set<string> }> = {}
+  // Aggregation over ALL products — scans every attribute key with a non-empty value
+  type AggRow = { _id: string; count: number; samples: string[] }
+  const agg: AggRow[] = await Product.aggregate([
+    { $project: { kvs: { $objectToArray: { $ifNull: ['$attributes', {}] } } } },
+    { $unwind: '$kvs' },
+    { $match: { 'kvs.v': { $nin: [null, '', 0, false] } } },
+    { $group: { _id: '$kvs.k', count: { $sum: 1 }, samples: { $push: { $toString: '$kvs.v' } } } },
+    { $project: { _id: 1, count: 1, samples: { $slice: ['$samples', 3] } } },
+    { $sort: { _id: 1 } },
+  ])
 
-  for (const p of sample) {
-    const attrs = p.attributes as Record<string, unknown> | undefined
-    if (!attrs) continue
-    for (const [key, val] of Object.entries(attrs)) {
-      attrKeys.add(key)
-      if (detail) {
-        if (!attrData[key]) attrData[key] = { count: 0, samples: new Set() }
-        attrData[key].count++
-        if (val && attrData[key].samples.size < 3) attrData[key].samples.add(String(val))
-      }
-    }
-  }
+  const attrKeys = agg.map(r => r._id)
 
   const fields = [
     ...STANDARD_FIELDS,
-    ...[...attrKeys].filter(k => !STANDARD_FIELDS.includes(k)).sort(),
+    ...attrKeys.filter(k => !STANDARD_FIELDS.includes(k)).sort(),
   ]
 
   if (!detail) return NextResponse.json({ fields })
 
-  const detailRows = [...attrKeys].sort().map(key => ({
-    key,
-    count: attrData[key]?.count ?? 0,
-    sample: [...(attrData[key]?.samples ?? [])],
+  const detailRows = agg.map(r => ({
+    key: r._id,
+    count: r.count,
+    sample: r.samples,
   }))
 
   return NextResponse.json({ fields, detail: detailRows })

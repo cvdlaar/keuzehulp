@@ -96,7 +96,7 @@ function applyMapping(raw: AnyRecord, mapping: FieldMapping): ParsedProduct {
 
 function buildDiagnostics(rawItems: AnyRecord[], mapping: FieldMapping): { diagnostics: MappingDiagnostic[]; rawKeys: string[]; attributeSample: Record<string, string> } {
   const firstRaw = rawItems[0] ?? {}
-  const sample20 = rawItems.slice(0, 20)
+  const sample20 = rawItems.slice(0, 200)
 
   const diagnostics: MappingDiagnostic[] = (Object.entries(mapping) as [string, string][])
     .filter(([, feedKey]) => feedKey)
