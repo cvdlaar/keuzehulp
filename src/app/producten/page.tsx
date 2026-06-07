@@ -256,6 +256,9 @@ export default function ProductenPage() {
                 detail={detail}
                 onClose={() => setSelectedId(null)}
                 formatPrice={formatPrice}
+                onAttributesUpdated={(id, attrs) => {
+                  setDetail(d => d ? { ...d, product: { ...d.product, attributes: attrs } } : d)
+                }}
               />
             )}
           </div>
@@ -269,13 +272,44 @@ function ProductDetailPanel({
   detail,
   onClose,
   formatPrice,
+  onAttributesUpdated,
 }: {
   detail: ProductDetail
   onClose: () => void
   formatPrice: (p: number) => string
+  onAttributesUpdated: (id: string, attrs: Record<string, string>) => void
 }) {
   const { product: p, stats, flows } = detail
   const attributes = p.attributes ? Object.entries(p.attributes) : []
+
+  const [editingAttrs, setEditingAttrs] = useState(false)
+  const [attrRows, setAttrRows] = useState<{ key: string; value: string }[]>([])
+  const [savingAttrs, setSavingAttrs] = useState(false)
+
+  const startEdit = () => {
+    setAttrRows(
+      attributes.length > 0
+        ? attributes.map(([k, v]) => ({ key: k, value: String(v) }))
+        : [{ key: '', value: '' }]
+    )
+    setEditingAttrs(true)
+  }
+
+  const saveAttrs = async () => {
+    setSavingAttrs(true)
+    const obj: Record<string, string> = {}
+    for (const { key, value } of attrRows) {
+      if (key.trim()) obj[key.trim()] = value
+    }
+    await fetch(`/api/products/${p._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attributes: obj }),
+    })
+    onAttributesUpdated(p._id, obj)
+    setEditingAttrs(false)
+    setSavingAttrs(false)
+  }
 
   return (
     <div>
@@ -445,25 +479,76 @@ function ProductDetailPanel({
         </div>
 
         {/* Attributen */}
-        {attributes.length > 0 && (
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Attributen ({attributes.length})
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Attributen {attributes.length > 0 && `(${attributes.length})`}
             </h3>
+            {!editingAttrs && (
+              <button onClick={startEdit} className="text-xs text-blue-600 hover:underline">
+                {attributes.length === 0 ? '+ Toevoegen' : 'Bewerken'}
+              </button>
+            )}
+          </div>
+
+          {editingAttrs ? (
+            <div className="space-y-2">
+              {attrRows.map((row, i) => (
+                <div key={i} className="flex gap-1.5 items-center">
+                  <input
+                    value={row.key}
+                    onChange={e => setAttrRows(rows => rows.map((r, j) => j === i ? { ...r, key: e.target.value } : r))}
+                    placeholder="veldnaam"
+                    className="w-32 flex-shrink-0 border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <input
+                    value={row.value}
+                    onChange={e => setAttrRows(rows => rows.map((r, j) => j === i ? { ...r, value: e.target.value } : r))}
+                    placeholder="waarde"
+                    className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <button
+                    onClick={() => setAttrRows(rows => rows.filter((_, j) => j !== i))}
+                    className="text-gray-300 hover:text-red-400 px-1 text-sm leading-none flex-shrink-0"
+                  >×</button>
+                </div>
+              ))}
+              <button
+                onClick={() => setAttrRows(rows => [...rows, { key: '', value: '' }])}
+                className="text-xs text-blue-600 hover:underline"
+              >+ Rij toevoegen</button>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={saveAttrs} disabled={savingAttrs}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingAttrs ? 'Opslaan…' : 'Opslaan'}
+                </button>
+                <button
+                  onClick={() => setEditingAttrs(false)}
+                  className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs rounded-lg hover:bg-gray-50"
+                >
+                  Annuleren
+                </button>
+              </div>
+            </div>
+          ) : attributes.length > 0 ? (
             <div className="rounded-lg border border-gray-200 overflow-hidden">
               <table className="w-full text-xs">
                 <tbody>
                   {attributes.map(([key, val]) => (
                     <tr key={key} className="border-b border-gray-100 last:border-0">
                       <td className="px-3 py-2 text-gray-400 font-medium bg-gray-50 w-36 align-top">{key}</td>
-                      <td className="px-3 py-2 text-gray-700">{String(val)}</td>
+                      <td className="px-3 py-2 text-gray-700">{String(val) || <span className="text-gray-300 italic">leeg</span>}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-gray-400 italic">Geen attributen. Klik &apos;Toevoegen&apos; om handmatig data in te voeren.</p>
+          )}
+        </div>
       </div>
     </div>
   )

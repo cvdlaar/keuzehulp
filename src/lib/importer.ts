@@ -126,14 +126,20 @@ function buildDiagnostics(rawItems: AnyRecord[], mapping: FieldMapping): { diagn
         Object.values(attributeSample).every(v => v !== '')) break
   }
 
-  // Pass 2: for keys still empty, scan until we find a non-empty value
+  // Pass 2: for keys still empty, scan until we find a non-empty extracted value OR a non-trivial raw value
   const needsSample = Object.keys(attributeSample).filter(k => attributeSample[k] === '')
   if (needsSample.length > 0) {
     for (const raw of rawItems) {
       for (const key of needsSample) {
         if (attributeSample[key] === '') {
-          const s = extractString(raw[key]).slice(0, 80)
-          if (s) attributeSample[key] = s
+          const v = raw[key]
+          const s = extractString(v).slice(0, 80)
+          if (s) {
+            attributeSample[key] = s
+          } else if (v !== null && v !== undefined && v !== '') {
+            // Value exists but extractString can't read it — show raw JSON so the structure is visible
+            attributeSample[key] = `[raw: ${JSON.stringify(v).slice(0, 60)}]`
+          }
         }
       }
       if (needsSample.every(k => attributeSample[k] !== '')) break
