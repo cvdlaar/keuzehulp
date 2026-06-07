@@ -62,7 +62,7 @@ export default function LogsPage() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Import logs</h1>
       <p className="text-gray-500 mb-8">Overzicht van alle uitgevoerde feed-imports.</p>
 

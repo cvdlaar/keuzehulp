@@ -9,7 +9,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Keuzehulp Admin",
+  title: "Keuzehulp",
   description: "Assortiment beheer voor de keuzehulp",
 };
 

@@ -94,7 +94,10 @@ function applyMapping(raw: AnyRecord, mapping: FieldMapping): ParsedProduct {
   }
 }
 
-function buildDiagnostics(firstRaw: AnyRecord, mapping: FieldMapping): { diagnostics: MappingDiagnostic[]; rawKeys: string[]; attributeSample: Record<string, string> } {
+function buildDiagnostics(rawItems: AnyRecord[], mapping: FieldMapping): { diagnostics: MappingDiagnostic[]; rawKeys: string[]; attributeSample: Record<string, string> } {
+  const firstRaw = rawItems[0] ?? {}
+  const sample20 = rawItems.slice(0, 20)
+
   const diagnostics: MappingDiagnostic[] = (Object.entries(mapping) as [string, string][])
     .filter(([, feedKey]) => feedKey)
     .map(([internalField, feedKey]) => {
@@ -105,9 +108,22 @@ function buildDiagnostics(firstRaw: AnyRecord, mapping: FieldMapping): { diagnos
 
   const mappedValues = new Set(Object.values(mapping).filter(Boolean))
   const attributeSample: Record<string, string> = {}
-  for (const [k, v] of Object.entries(firstRaw)) {
-    if (mappedValues.has(k)) continue
-    attributeSample[k] = extractString(v).slice(0, 80)
+
+  // Collect all attribute keys from the first 20 products
+  for (const raw of sample20) {
+    for (const [k] of Object.entries(raw)) {
+      if (!mappedValues.has(k) && !(k in attributeSample)) {
+        attributeSample[k] = ''
+      }
+    }
+  }
+
+  // For each discovered key, find the first non-empty sample value
+  for (const key of Object.keys(attributeSample)) {
+    for (const raw of sample20) {
+      const s = extractString(raw[key]).slice(0, 80)
+      if (s) { attributeSample[key] = s; break }
+    }
   }
 
   return { diagnostics, rawKeys: Object.keys(firstRaw), attributeSample }
@@ -173,9 +189,8 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
 
     const products = rawItems.map((item) => applyMapping(item, typedMapping))
 
-    // Mapping-diagnostics op basis van het eerste product
-    const { diagnostics: mappingDiagnostics, rawKeys, attributeSample } = rawItems[0]
-      ? buildDiagnostics(rawItems[0], typedMapping)
+    const { diagnostics: mappingDiagnostics, rawKeys, attributeSample } = rawItems.length > 0
+      ? buildDiagnostics(rawItems, typedMapping)
       : { diagnostics: [], rawKeys: [], attributeSample: {} }
 
     // Totaal bekend + diagnostics — direct in het log zetten zodat voortgangsbalk werkt

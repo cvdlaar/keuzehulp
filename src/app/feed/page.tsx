@@ -189,7 +189,7 @@ export default function FeedPage() {
   const availableKeys = mappingId ? feedKeys(mappingId) : []
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Feed configuratie</h1>
       <p className="text-gray-500 mb-8">Koppel je Channable-feed en stel de veldmapping in.</p>
 

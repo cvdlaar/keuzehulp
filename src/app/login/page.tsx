@@ -114,7 +114,7 @@ export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined)
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       {/* Illustratie — verborgen op mobiel */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden">
         <Illustration />
@@ -122,7 +122,7 @@ export default function LoginPage() {
           <p className="text-white text-3xl font-bold leading-snug mb-2">
             De slimste weg<br />naar het juiste product.
           </p>
-          <p className="text-blue-200 text-sm">Keuzehulp Admin — beheer al je configurators</p>
+          <p className="text-blue-200 text-sm">Beheer al je configurators</p>
         </div>
       </div>
 

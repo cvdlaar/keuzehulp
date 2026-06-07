@@ -1226,15 +1226,46 @@ export default function WidgetPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              {matching ? 'Zoeken…' : (flow?.resultsTitle || 'Jouw resultaten')}
+              {matching ? 'Resultaten ophalen' : (flow?.resultsTitle || 'Jouw resultaten')}
             </h2>
             <button onClick={restart} className="text-xs text-blue-600 hover:underline">Opnieuw beginnen</button>
           </div>
 
-          {/* Laadanimatie */}
-          {matching && (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
+          {/* Laadanimatie met samenvatting van gemaakte keuzes */}
+          {matching && flow && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-4 flex flex-col gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-3 w-3 flex-shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: 'var(--kh)' }} />
+                    <span className="relative inline-flex rounded-full h-3 w-3" style={{ backgroundColor: 'var(--kh)' }} />
+                  </span>
+                  <p className="text-sm font-medium text-gray-700">We koppelen producten aan jouw keuzes…</p>
+                </div>
+                {(() => {
+                  const labels: string[] = []
+                  for (const [qId, val] of Object.entries(selectedAnswers)) {
+                    const q = flow.questions.find(x => x.id === qId)
+                    if (!q) continue
+                    const ids = Array.isArray(val) ? val : [val]
+                    for (const aid of ids) {
+                      const ans = q.answers.find(a => a.id === aid)
+                      if (ans) labels.push(ans.label || ans.text)
+                      else if (q.type === 'range') labels.push(`${val}${q.rangeUnit ? ' ' + q.rangeUnit : ''}`)
+                    }
+                  }
+                  return labels.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {labels.map((l, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: 'var(--kh)' }}>{l}</span>
+                      ))}
+                    </div>
+                  ) : null
+                })()}
+              </div>
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
+              </div>
             </div>
           )}
 

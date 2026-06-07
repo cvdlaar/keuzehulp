@@ -151,7 +151,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-5xl space-y-8">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Dashboard</h1>
         <p className="text-gray-500">Overzicht van gebruik en assortiment</p>

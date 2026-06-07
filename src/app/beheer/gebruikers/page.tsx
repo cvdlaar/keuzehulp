@@ -77,7 +77,7 @@ export default function GebruikersPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Gebruikersbeheer</h1>
         <p className="text-gray-500 text-sm">Beheer wie toegang heeft tot het admin-paneel.</p>

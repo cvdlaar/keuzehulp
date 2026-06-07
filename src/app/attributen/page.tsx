@@ -22,7 +22,7 @@ export default function AttributenPage() {
   const filtered = rows.filter(r => !search || r.key.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Attributen</h1>
       <p className="text-gray-500 mb-6">
         Alle velden uit de feed die als attribuut zijn opgeslagen. Gebruik de veldnaam in matchregels en displayattributen van een keuzehulp.
