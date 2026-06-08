@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import AdminLayout from "@/components/AdminLayout";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="nl" className={`${geistSans.variable} h-full`}>
+    <html lang="nl" className={`${inter.variable} h-full`}>
       <body className="min-h-full bg-gray-50 text-gray-900">
         <AdminLayout>{children}</AdminLayout>
       </body>
