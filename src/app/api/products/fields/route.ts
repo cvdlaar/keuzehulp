@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const detail = new URL(req.url).searchParams.get('detail') === '1'
 
-  // Aggregation over ALL products — scans every attribute key with a non-empty value
+  // Aggregation over dynamic attributes in product.attributes
   type AggRow = { _id: string; count: number; samples: string[] }
   const agg: AggRow[] = await Product.aggregate([
     { $project: { kvs: { $objectToArray: { $ifNull: ['$attributes', {}] } } } },
@@ -37,11 +37,54 @@ export async function GET(req: NextRequest) {
 
   if (!detail) return NextResponse.json({ fields })
 
-  const detailRows = agg.map(r => ({
-    key: r._id,
-    count: r.count,
-    sample: r.samples,
-  }))
+  // Aggregation over standard (top-level) fields
+  const stdAgg: AggRow[] = await Product.aggregate([
+    {
+      $project: STANDARD_FIELDS.reduce((acc, f) => ({ ...acc, [f]: 1 }), {} as Record<string, number>)
+    },
+    {
+      $project: {
+        pairs: {
+          $filter: {
+            input: { $objectToArray: '$$ROOT' },
+            as: 'p',
+            cond: {
+              $and: [
+                { $ne: ['$$p.k', '_id'] },
+                { $ne: ['$$p.v', null] },
+                { $ne: [{ $toString: '$$p.v' }, ''] },
+              ]
+            }
+          }
+        }
+      }
+    },
+    { $unwind: '$pairs' },
+    {
+      $group: {
+        _id: '$pairs.k',
+        count: { $sum: 1 },
+        samples: { $push: { $substr: [{ $toString: '$pairs.v' }, 0, 80] } }
+      }
+    },
+    { $match: { count: { $gt: 0 } } },
+    { $project: { _id: 1, count: 1, samples: { $slice: ['$samples', 3] } } },
+  ])
+
+  const stdDetailMap = new Map(stdAgg.map(r => [r._id, r]))
+
+  // Standard fields first (in STANDARD_FIELDS order), then dynamic attributes
+  const detailRows = [
+    ...STANDARD_FIELDS
+      .map(f => {
+        const r = stdDetailMap.get(f)
+        return r ? { key: r._id, count: r.count, sample: r.samples } : null
+      })
+      .filter(Boolean),
+    ...agg
+      .filter(r => !STANDARD_FIELDS.includes(r._id))
+      .map(r => ({ key: r._id, count: r.count, sample: r.samples })),
+  ]
 
   return NextResponse.json({ fields, detail: detailRows })
 }

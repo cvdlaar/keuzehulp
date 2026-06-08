@@ -52,14 +52,17 @@ export interface MappingDiagnostic {
   sample: string
 }
 
-function applyMapping(raw: AnyRecord, mapping: FieldMapping): ParsedProduct {
+function applyMapping(raw: AnyRecord, mapping: FieldMapping, attributeMapping: Record<string, string> = {}): ParsedProduct {
   const get = (field: string): string => {
     if (!field) return ''
     return extractString(raw[field])
   }
 
   const attributes: Record<string, string> = {}
-  const mappedValues = new Set(Object.values(mapping).filter(Boolean))
+  const mappedValues = new Set([
+    ...Object.values(mapping).filter(Boolean),
+    ...Object.values(attributeMapping).filter(Boolean),
+  ])
 
   for (const [k, v] of Object.entries(raw)) {
     if (mappedValues.has(k)) continue
@@ -76,6 +79,12 @@ function applyMapping(raw: AnyRecord, mapping: FieldMapping): ParsedProduct {
         if (sv) attributes[`${k}_${subK}`] = sv
       }
     }
+  }
+
+  for (const [attrName, feedKey] of Object.entries(attributeMapping)) {
+    if (!feedKey) continue
+    const s = extractString(raw[feedKey])
+    if (s) attributes[attrName] = s
   }
 
   return {
@@ -195,6 +204,7 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
     if (v !== '') mapping[k] = v
   }
   const typedMapping = mapping as unknown as FieldMapping
+  const attributeMapping = (config.attributeMapping ?? {}) as Record<string, string>
 
   try {
     const response = await axios.get<string>(config.url, {
@@ -207,7 +217,7 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
       ? extractCSVItems(response.data)
       : extractXMLItems(response.data)
 
-    const products = rawItems.map((item) => applyMapping(item, typedMapping))
+    const products = rawItems.map((item) => applyMapping(item, typedMapping, attributeMapping))
 
     const { diagnostics: mappingDiagnostics, rawKeys, attributeSample } = rawItems.length > 0
       ? buildDiagnostics(rawItems, typedMapping)

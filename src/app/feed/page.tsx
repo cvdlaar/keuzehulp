@@ -13,6 +13,7 @@ interface FeedConfig {
   format: 'xml' | 'csv'
   active: boolean
   fieldMapping: FieldMapping
+  attributeMapping?: Record<string, string>
   lastImportAt: string | null
   schedule: ImportSchedule
   nextImportAt: string | null
@@ -48,6 +49,7 @@ export default function FeedPage() {
   const [previewData, setPreviewData] = useState<Record<string, PreviewData>>({})
   const [mappingId, setMappingId] = useState<string | null>(null)
   const [mappingForm, setMappingForm] = useState<FieldMapping>({ ...DEFAULT_MAPPING })
+  const [mappingAttrs, setMappingAttrs] = useState<{ name: string; feedKey: string }[]>([])
   const [savingMapping, setSavingMapping] = useState(false)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -138,15 +140,20 @@ export default function FeedPage() {
   const openMapping = (c: FeedConfig) => {
     setMappingId(c._id)
     setMappingForm({ ...DEFAULT_MAPPING, ...(c.fieldMapping ?? {}) })
+    const existing = c.attributeMapping ?? {}
+    setMappingAttrs(Object.entries(existing).map(([name, feedKey]) => ({ name, feedKey })))
   }
 
   const saveMapping = async () => {
     if (!mappingId) return
     setSavingMapping(true)
+    const attributeMapping = Object.fromEntries(
+      mappingAttrs.filter(a => a.name.trim() && a.feedKey.trim()).map(a => [a.name.trim(), a.feedKey.trim()])
+    )
     await fetch('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: mappingId, fieldMapping: mappingForm }),
+      body: JSON.stringify({ id: mappingId, fieldMapping: mappingForm, attributeMapping }),
     })
     setSavingMapping(false)
     setMappingId(null)
@@ -422,6 +429,61 @@ export default function FeedPage() {
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Aangepaste attributen */}
+            <div className="px-6 pb-4">
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700">Aangepaste attributen</p>
+                  <button
+                    onClick={() => setMappingAttrs([...mappingAttrs, { name: '', feedKey: '' }])}
+                    className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                  >
+                    + Attribuut toevoegen
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mb-3">Koppel een feedkolom aan een attribuutnaam. Deze attribuutnaam kun je gebruiken in matchregels.</p>
+                {mappingAttrs.length === 0 && (
+                  <p className="text-xs text-gray-400 italic">Nog geen aangepaste attributen.</p>
+                )}
+                {mappingAttrs.map((attr, i) => (
+                  <div key={i} className="flex items-center gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={attr.name}
+                      onChange={e => setMappingAttrs(mappingAttrs.map((a, j) => j === i ? { ...a, name: e.target.value } : a))}
+                      placeholder="attribuutnaam"
+                      className="w-32 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <span className="text-gray-400 text-xs">←</span>
+                    {availableKeys.length > 0 ? (
+                      <select
+                        value={attr.feedKey}
+                        onChange={e => setMappingAttrs(mappingAttrs.map((a, j) => j === i ? { ...a, feedKey: e.target.value } : a))}
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">— feedkolom —</option>
+                        {availableKeys.map(k => <option key={k} value={k}>{k}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={attr.feedKey}
+                        onChange={e => setMappingAttrs(mappingAttrs.map((a, j) => j === i ? { ...a, feedKey: e.target.value } : a))}
+                        placeholder="feedkolom"
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    )}
+                    <button
+                      onClick={() => setMappingAttrs(mappingAttrs.filter((_, j) => j !== i))}
+                      className="text-red-400 hover:text-red-600 text-sm px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="px-6 py-4 border-t border-gray-200 flex gap-3">

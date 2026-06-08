@@ -12,6 +12,7 @@ export interface IFeedConfig extends Document {
   format: 'xml' | 'csv'
   active: boolean
   fieldMapping: FieldMapping
+  attributeMapping: Record<string, string>
   lastImportAt: Date | null
   schedule: ImportSchedule
   nextImportAt: Date | null
@@ -26,6 +27,7 @@ const FeedConfigSchema = new Schema<IFeedConfig>(
     format: { type: String, enum: ['xml', 'csv'], default: 'xml' },
     active: { type: Boolean, default: true },
     fieldMapping: { type: Schema.Types.Mixed, default: () => ({ ...DEFAULT_MAPPING }) },
+    attributeMapping: { type: Schema.Types.Mixed, default: () => ({}) },
     lastImportAt: { type: Date, default: null },
     schedule: { type: String, enum: ['none', 'hourly', 'daily', 'weekly'], default: 'none' },
     nextImportAt: { type: Date, default: null },
