@@ -13,7 +13,6 @@ export async function GET(req: NextRequest) {
 
   const detail = new URL(req.url).searchParams.get('detail') === '1'
 
-  // Aggregation over dynamic attributes in product.attributes
   type AggRow = { _id: string; count: number; samples: string[] }
   const agg: AggRow[] = await Product.aggregate([
     { $project: { kvs: { $objectToArray: { $ifNull: ['$attributes', {}] } } } },
@@ -29,7 +28,6 @@ export async function GET(req: NextRequest) {
   ])
 
   const attrKeys = agg.map(r => r._id)
-
   const fields = [
     ...STANDARD_FIELDS,
     ...attrKeys.filter(k => !STANDARD_FIELDS.includes(k)).sort(),
@@ -37,30 +35,22 @@ export async function GET(req: NextRequest) {
 
   if (!detail) return NextResponse.json({ fields })
 
-  // Aggregation over standard (top-level) fields via $facet
-  type FacetRow = { count: number; samples: string[] }
-  type FacetResult = Record<string, FacetRow[]>
-
   let stdDetailRows: { key: string; count: number; sample: string[] }[] = []
   try {
-    const facetStages: Record<string, object[]> = {}
-    for (const field of STANDARD_FIELDS) {
-      facetStages[field] = [
-        { $match: { [field]: { $nin: [null, ''] } } },
-        { $group: { _id: null, count: { $sum: 1 }, samples: { $push: { $toString: `$${field}` } } } },
-        { $project: { _id: 0, count: 1, samples: { $slice: ['$samples', 3] } } },
-      ]
-    }
-    const [facetResult] = await Product.aggregate<FacetResult>([{ $facet: facetStages }])
-    stdDetailRows = STANDARD_FIELDS
-      .map(f => {
-        const rows = facetResult?.[f] ?? []
-        if (rows.length === 0) return null
-        return { key: f, count: rows[0].count, sample: rows[0].samples }
+    stdDetailRows = (await Promise.all(
+      STANDARD_FIELDS.map(async (field) => {
+        const filter = { [field]: { $nin: [null, ''] } }
+        const count = await Product.countDocuments(filter)
+        if (count === 0) return null
+        const docs = await Product.find(filter).limit(3).select(field).lean()
+        const sample = docs
+          .map(d => String((d as Record<string, unknown>)[field]))
+          .filter(Boolean)
+        return { key: field, count, sample }
       })
-      .filter((r): r is { key: string; count: number; sample: string[] } => r !== null)
+    )).filter((r): r is { key: string; count: number; sample: string[] } => r !== null)
   } catch {
-    // Als de aggregatie faalt, standaardvelden weglaten uit detail
+    // standaardvelden weglaten bij fout
   }
 
   const detailRows = [
