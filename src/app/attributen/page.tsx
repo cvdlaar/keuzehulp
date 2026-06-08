@@ -17,6 +17,7 @@ export default function AttributenPage() {
     fetch('/api/products/fields?detail=1')
       .then(r => r.json())
       .then(d => { setRows(d.detail ?? []); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   const filtered = rows.filter(r => !search || r.key.toLowerCase().includes(search.toLowerCase()))

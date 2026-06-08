@@ -37,50 +37,34 @@ export async function GET(req: NextRequest) {
 
   if (!detail) return NextResponse.json({ fields })
 
-  // Aggregation over standard (top-level) fields
-  const stdAgg: AggRow[] = await Product.aggregate([
-    {
-      $project: STANDARD_FIELDS.reduce((acc, f) => ({ ...acc, [f]: 1 }), {} as Record<string, number>)
-    },
-    {
-      $project: {
-        pairs: {
-          $filter: {
-            input: { $objectToArray: '$$ROOT' },
-            as: 'p',
-            cond: {
-              $and: [
-                { $ne: ['$$p.k', '_id'] },
-                { $ne: ['$$p.v', null] },
-                { $ne: [{ $toString: '$$p.v' }, ''] },
-              ]
-            }
-          }
-        }
-      }
-    },
-    { $unwind: '$pairs' },
-    {
-      $group: {
-        _id: '$pairs.k',
-        count: { $sum: 1 },
-        samples: { $push: { $substr: [{ $toString: '$pairs.v' }, 0, 80] } }
-      }
-    },
-    { $match: { count: { $gt: 0 } } },
-    { $project: { _id: 1, count: 1, samples: { $slice: ['$samples', 3] } } },
-  ])
+  // Aggregation over standard (top-level) fields via $facet
+  type FacetRow = { count: number; samples: string[] }
+  type FacetResult = Record<string, FacetRow[]>
 
-  const stdDetailMap = new Map(stdAgg.map(r => [r._id, r]))
-
-  // Standard fields first (in STANDARD_FIELDS order), then dynamic attributes
-  const detailRows = [
-    ...STANDARD_FIELDS
+  let stdDetailRows: { key: string; count: number; sample: string[] }[] = []
+  try {
+    const facetStages: Record<string, object[]> = {}
+    for (const field of STANDARD_FIELDS) {
+      facetStages[field] = [
+        { $match: { [field]: { $nin: [null, ''] } } },
+        { $group: { _id: null, count: { $sum: 1 }, samples: { $push: { $toString: `$${field}` } } } },
+        { $project: { _id: 0, count: 1, samples: { $slice: ['$samples', 3] } } },
+      ]
+    }
+    const [facetResult] = await Product.aggregate<FacetResult>([{ $facet: facetStages }])
+    stdDetailRows = STANDARD_FIELDS
       .map(f => {
-        const r = stdDetailMap.get(f)
-        return r ? { key: r._id, count: r.count, sample: r.samples } : null
+        const rows = facetResult?.[f] ?? []
+        if (rows.length === 0) return null
+        return { key: f, count: rows[0].count, sample: rows[0].samples }
       })
-      .filter(Boolean),
+      .filter((r): r is { key: string; count: number; sample: string[] } => r !== null)
+  } catch {
+    // Als de aggregatie faalt, standaardvelden weglaten uit detail
+  }
+
+  const detailRows = [
+    ...stdDetailRows,
     ...agg
       .filter(r => !STANDARD_FIELDS.includes(r._id))
       .map(r => ({ key: r._id, count: r.count, sample: r.samples })),
