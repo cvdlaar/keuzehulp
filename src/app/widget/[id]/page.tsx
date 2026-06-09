@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 
 interface Answer {
@@ -656,7 +656,7 @@ function translateQuestion(q: Question, tr: FlowTranslation | undefined): Questi
   }
 }
 
-export default function WidgetPage() {
+function WidgetPageInner() {
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const locale = searchParams.get('locale') ?? 'NL-NL'
@@ -1440,5 +1440,13 @@ export default function WidgetPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function WidgetPage() {
+  return (
+    <Suspense fallback={null}>
+      <WidgetPageInner />
+    </Suspense>
   )
 }
