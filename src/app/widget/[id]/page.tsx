@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 
 interface Answer {
   id: string
@@ -39,10 +39,16 @@ interface WidgetStyle {
   fontFamily: string
 }
 
+interface AnswerTranslation { text?: string; label?: string; info?: string }
+interface QuestionTranslation { text?: string; intro?: string; answers?: Record<string, AnswerTranslation> }
+interface FlowTranslation { questions?: Record<string, QuestionTranslation> }
+
 interface Flow {
   _id: string
   name: string
   description: string
+  storeView?: string
+  translations?: Record<string, FlowTranslation>
   startQuestionId: string
   questions: Question[]
   adobeCommerceUrl?: string
@@ -634,8 +640,26 @@ function EmailResultsForm({ flow, products, khRadius }: {
 
 // ── Hoofdpagina ──────────────────────────────────────────────────────────────
 
+function translateQuestion(q: Question, tr: FlowTranslation | undefined): Question {
+  if (!tr) return q
+  const qTr = tr.questions?.[q.id]
+  if (!qTr) return q
+  return {
+    ...q,
+    text: qTr.text || q.text,
+    intro: qTr.intro || q.intro,
+    answers: q.answers.map(a => {
+      const aTr = qTr.answers?.[a.id]
+      if (!aTr) return a
+      return { ...a, text: aTr.text || a.text, label: aTr.label || a.label, info: aTr.info || a.info }
+    }),
+  }
+}
+
 export default function WidgetPage() {
   const { id } = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
+  const locale = searchParams.get('locale') ?? 'NL-NL'
 
   const [flow, setFlow] = useState<Flow | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
@@ -696,7 +720,9 @@ export default function WidgetPage() {
     showShopRating: false,
     ...(flow?.widgetBehavior ?? {}),
   }
-  const currentQuestion = flow?.questions.find(q => q.id === currentQuestionId)
+  const localeTr = flow?.translations?.[locale]
+  const rawQuestion = flow?.questions.find(q => q.id === currentQuestionId)
+  const currentQuestion = rawQuestion ? translateQuestion(rawQuestion, localeTr) : undefined
   const formatPrice = (p: number) => `€ ${p.toFixed(2).replace('.', ',')}`
 
   // Antwoorden onthouden in localStorage

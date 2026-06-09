@@ -30,7 +30,7 @@ const SCHEDULE_INTERVALS: Record<string, number> = {
 export async function PUT(req: NextRequest) {
   await connectDB()
   const body = await req.json()
-  const { id, name, url, format, active, fieldMapping, attributeMapping, schedule } = body
+  const { id, name, url, format, active, storeView, fieldMapping, attributeMapping, schedule } = body
 
   if (!id) {
     return NextResponse.json({ error: 'ID is verplicht' }, { status: 400 })
@@ -41,6 +41,7 @@ export async function PUT(req: NextRequest) {
   if (url !== undefined) update.url = url
   if (format !== undefined) update.format = format
   if (active !== undefined) update.active = active
+  if (storeView !== undefined) update.storeView = storeView
   if (fieldMapping !== undefined) update.fieldMapping = fieldMapping
   if (attributeMapping !== undefined) update.attributeMapping = attributeMapping
   if (schedule !== undefined) {

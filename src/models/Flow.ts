@@ -107,10 +107,28 @@ export const DEFAULT_BOOST: BoostConfig = {
   skuBoosts: [],
 }
 
+export interface AnswerTranslation {
+  text?: string
+  label?: string
+  info?: string
+}
+
+export interface QuestionTranslation {
+  text?: string
+  intro?: string
+  answers?: Record<string, AnswerTranslation>
+}
+
+export interface FlowTranslation {
+  questions?: Record<string, QuestionTranslation>
+}
+
 export interface IFlow extends Document {
   _id: Types.ObjectId
   name: string
   description: string
+  storeView: string
+  translations: Record<string, FlowTranslation>
   startQuestionId: string
   questions: Question[]
   active: boolean
@@ -195,6 +213,8 @@ const FlowSchema = new Schema<IFlow>(
   {
     name: { type: String, required: true },
     description: { type: String, default: '' },
+    storeView: { type: String, default: 'NL-NL' },
+    translations: { type: Schema.Types.Mixed, default: () => ({}) },
     startQuestionId: { type: String, default: '' },
     questions: [QuestionSchema],
     active: { type: Boolean, default: true },

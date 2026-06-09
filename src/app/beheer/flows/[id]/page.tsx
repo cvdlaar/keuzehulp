@@ -108,10 +108,28 @@ const DEFAULT_BEHAVIOR: WidgetBehavior = {
   showShopRating: false,
 }
 
+interface AnswerTranslation {
+  text?: string
+  label?: string
+  info?: string
+}
+
+interface QuestionTranslation {
+  text?: string
+  intro?: string
+  answers?: Record<string, AnswerTranslation>
+}
+
+interface FlowTranslation {
+  questions?: Record<string, QuestionTranslation>
+}
+
 interface Flow {
   _id: string
   name: string
   description: string
+  storeView: string
+  translations: Record<string, FlowTranslation>
   startQuestionId: string
   questions: Question[]
   active: boolean
@@ -1093,7 +1111,7 @@ function EmbedTab({ flowId, flowName, primaryColor }: { flowId: string; flowName
 
 // ── Hoofdpagina ──────────────────────────────────────────────────────────────
 
-type Tab = 'editor' | 'schema' | 'preview' | 'instellingen' | 'statistieken' | 'embed'
+type Tab = 'editor' | 'schema' | 'preview' | 'instellingen' | 'vertalingen' | 'statistieken' | 'embed'
 
 export default function FlowEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -1110,6 +1128,7 @@ export default function FlowEditorPage() {
   const [productResults, setProductResults] = useState<Record<string, ProductHit[]>>({})
   const [availableFields, setAvailableFields] = useState<string[]>([])
   const [matchCounts, setMatchCounts] = useState<Record<string, number | null>>({})
+  const [activeLocale, setActiveLocale] = useState<'NL-BE' | 'FR-BE'>('NL-BE')
 
   useEffect(() => {
     fetch(`/api/flows/${id}`)
@@ -1431,6 +1450,7 @@ export default function FlowEditorPage() {
     { key: 'schema', label: '⬡ Stroomschema' },
     { key: 'preview', label: '▶ Voorbeeld' },
     { key: 'instellingen', label: '⚙ Instellingen' },
+    { key: 'vertalingen', label: '🌐 Vertalingen' },
     { key: 'statistieken', label: '📊 Statistieken' },
     { key: 'embed', label: '</> Embed' },
   ]
@@ -2173,6 +2193,24 @@ export default function FlowEditorPage() {
       {activeTab === 'instellingen' && (
         <div className="space-y-5">
 
+          {/* ── Winkelzicht ──────────────────────────────── */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-1 pt-1">Winkelzicht</p>
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="font-semibold text-gray-800 mb-1">Winkelzicht</h3>
+            <p className="text-xs text-gray-400 mb-4">Bepaalt welke productcatalogus gebruikt wordt voor matches. Vertalingen voor andere locales stel je in via het tabblad Vertalingen.</p>
+            <div className="flex items-center gap-3">
+              <select
+                value={flow.storeView ?? 'NL-NL'}
+                onChange={e => update(f => ({ ...f, storeView: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                <option value="NL-NL">NL-NL — Nederlands (Nederland)</option>
+                <option value="NL-BE">NL-BE — Nederlands (België)</option>
+                <option value="FR-BE">FR-BE — Frans (België)</option>
+              </select>
+            </div>
+          </section>
+
           {/* ── Weergave ─────────────────────────────────── */}
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-1 pt-1">Weergave</p>
 
@@ -2797,6 +2835,132 @@ export default function FlowEditorPage() {
           </button>
         </div>
       )}
+
+      {/* ── Tab: Vertalingen ── */}
+      {activeTab === 'vertalingen' && (() => {
+        const LOCALES = [
+          { value: 'NL-BE' as const, label: 'NL-BE — Nederlands (België)' },
+          { value: 'FR-BE' as const, label: 'FR-BE — Frans (België)' },
+        ]
+        const translations: Record<string, FlowTranslation> = flow.translations ?? {}
+        const localeTr: FlowTranslation = translations[activeLocale] ?? {}
+
+        const setQText = (qId: string, field: 'text' | 'intro', val: string) => {
+          const updated: Record<string, FlowTranslation> = {
+            ...translations,
+            [activeLocale]: {
+              ...localeTr,
+              questions: {
+                ...(localeTr.questions ?? {}),
+                [qId]: {
+                  ...(localeTr.questions?.[qId] ?? {}),
+                  [field]: val,
+                },
+              },
+            },
+          }
+          update(f => ({ ...f, translations: updated }))
+        }
+
+        const setAText = (qId: string, aId: string, field: keyof AnswerTranslation, val: string) => {
+          const qTr = localeTr.questions?.[qId] ?? {}
+          const updated: Record<string, FlowTranslation> = {
+            ...translations,
+            [activeLocale]: {
+              ...localeTr,
+              questions: {
+                ...(localeTr.questions ?? {}),
+                [qId]: {
+                  ...qTr,
+                  answers: {
+                    ...(qTr.answers ?? {}),
+                    [aId]: {
+                      ...(qTr.answers?.[aId] ?? {}),
+                      [field]: val,
+                    },
+                  },
+                },
+              },
+            },
+          }
+          update(f => ({ ...f, translations: updated }))
+        }
+
+        return (
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">Locale:</span>
+              {LOCALES.map(l => (
+                <button
+                  key={l.value}
+                  type="button"
+                  onClick={() => setActiveLocale(l.value)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                    activeLocale === l.value
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'border-gray-200 text-gray-600 hover:border-blue-300'
+                  }`}
+                >
+                  {l.value}
+                </button>
+              ))}
+              <span className="text-xs text-gray-400 ml-2">{LOCALES.find(l => l.value === activeLocale)?.label}</span>
+            </div>
+
+            <p className="text-xs text-gray-400">Laat een veld leeg om de standaard Nederlandse tekst (NL-NL) te gebruiken.</p>
+
+            {flow.questions.map(q => {
+              const qTr = localeTr.questions?.[q.id] ?? {}
+              return (
+                <section key={q.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Vraag (NL-NL): <span className="text-gray-600">{q.text}</span></p>
+                    <input
+                      type="text"
+                      value={qTr.text ?? ''}
+                      onChange={e => setQText(q.id, 'text', e.target.value)}
+                      placeholder={`Vertaling in ${activeLocale}…`}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </div>
+                  {q.intro && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">Intro (NL-NL): <span className="text-gray-600">{q.intro}</span></p>
+                      <input
+                        type="text"
+                        value={qTr.intro ?? ''}
+                        onChange={e => setQText(q.id, 'intro', e.target.value)}
+                        placeholder={`Vertaling intro in ${activeLocale}…`}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+                  )}
+                  {q.answers.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-gray-100">
+                      <p className="text-xs font-medium text-gray-500">Antwoorden</p>
+                      {q.answers.map(a => {
+                        const aTr = qTr.answers?.[a.id] ?? {}
+                        return (
+                          <div key={a.id} className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 w-40 shrink-0 truncate">{a.text || '(geen tekst)'}</span>
+                            <input
+                              type="text"
+                              value={aTr.text ?? ''}
+                              onChange={e => setAText(q.id, a.id, 'text', e.target.value)}
+                              placeholder={`${activeLocale}…`}
+                              className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              )
+            })}
+          </div>
+        )
+      })()}
 
       {/* ── Tab: Statistieken ── */}
       {activeTab === 'statistieken' && (

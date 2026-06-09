@@ -18,7 +18,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/flows/[id]'>
   // Volledige flow-update: de client stuurt het hele flow-object terug
   const update: Record<string, unknown> = {}
   const fields = [
-    'name','description','startQuestionId','questions','active','boostConfig',
+    'name','description','storeView','translations','startQuestionId','questions','active','boostConfig',
     'adobeCommerceUrl','widgetStyle','widgetBehavior','emailResults','emailSubject',
     'spotlerAttributes','resultsSummaryTemplate','displayAttributes','resultsTitle',
     'maatwerkTitle','maatwerkIntro','maatwerkEmailTo','maatwerkFields','maatwerkIncludeAddress',

@@ -11,6 +11,7 @@ interface FeedConfig {
   name: string
   url: string
   format: 'xml' | 'csv'
+  storeView: string
   active: boolean
   fieldMapping: FieldMapping
   attributeMapping?: Record<string, string>
@@ -27,7 +28,13 @@ interface PreviewData {
   sample?: Record<string, unknown>[]
 }
 
-const emptyForm = { name: '', url: '', format: 'xml' as 'xml' | 'csv' }
+const STORE_VIEWS = [
+  { value: 'NL-NL', label: 'NL-NL — Nederlands (Nederland)' },
+  { value: 'NL-BE', label: 'NL-BE — Nederlands (België)' },
+  { value: 'FR-BE', label: 'FR-BE — Frans (België)' },
+]
+
+const emptyForm = { name: '', url: '', format: 'xml' as 'xml' | 'csv', storeView: 'NL-NL' }
 
 interface ImportProgress {
   logId: string
@@ -245,6 +252,16 @@ export default function FeedPage() {
               <option value="csv">CSV</option>
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Winkelzicht</label>
+            <select
+              value={form.storeView}
+              onChange={(e) => setForm({ ...form, storeView: e.target.value })}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {STORE_VIEWS.map(sv => <option key={sv.value} value={sv.value}>{sv.label}</option>)}
+            </select>
+          </div>
           <div className="flex gap-3">
             <button type="submit" className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
               {editId ? 'Opslaan' : 'Feed toevoegen'}
@@ -314,7 +331,7 @@ export default function FeedPage() {
                   className="px-3 py-1.5 rounded-lg text-xs font-medium border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors">
                   ⇄ Mapping
                 </button>
-                <button onClick={() => { setEditId(c._id); setForm({ name: c.name, url: c.url, format: c.format }) }}
+                <button onClick={() => { setEditId(c._id); setForm({ name: c.name, url: c.url, format: c.format, storeView: c.storeView ?? 'NL-NL' }) }}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-300 hover:bg-gray-50 transition-colors">
                   Bewerken
                 </button>

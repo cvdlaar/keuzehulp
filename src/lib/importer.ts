@@ -205,6 +205,10 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
   }
   const typedMapping = mapping as unknown as FieldMapping
   const attributeMapping = (config.attributeMapping ?? {}) as Record<string, string>
+  const storeView = (config.storeView as string | undefined) ?? 'NL-NL'
+
+  // Migreer bestaande producten zonder storeView naar NL-NL
+  await Product.updateMany({ storeView: { $exists: false } }, { $set: { storeView: 'NL-NL' } })
 
   try {
     const response = await axios.get<string>(config.url, {
@@ -217,7 +221,7 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
       ? extractCSVItems(response.data)
       : extractXMLItems(response.data)
 
-    const products = rawItems.map((item) => applyMapping(item, typedMapping, attributeMapping))
+    const products = rawItems.map((item) => ({ ...applyMapping(item, typedMapping, attributeMapping), storeView }))
 
     const { diagnostics: mappingDiagnostics, rawKeys, attributeSample } = rawItems.length > 0
       ? buildDiagnostics(rawItems, typedMapping)
@@ -240,7 +244,7 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
 
       const ops = batch.map(p => ({
         updateOne: {
-          filter: { externalId: p.externalId },
+          filter: { externalId: p.externalId, storeView: p.storeView },
           update: { $set: p },
           upsert: true,
         },

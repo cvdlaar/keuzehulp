@@ -224,6 +224,8 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/flows/[id]/
   const flow = await Flow.findById(id).lean()
   if (!flow) return NextResponse.json({ error: 'Niet gevonden' }, { status: 404 })
 
+  const storeViewFilter = { storeView: (flow.storeView as string | undefined) ?? 'NL-NL' }
+
   const boost: BoostConfig = { ...DEFAULT_BOOST, ...(flow.boostConfig ?? {}) }
 
   // Verzamel geselecteerde antwoorden
@@ -292,10 +294,10 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/flows/[id]/
     const orClauses: Record<string, unknown>[] = []
     if (pinnedIds.length) orClauses.push({ _id: { $in: pinnedIds } })
     if (ruleFilters.length) orClauses.push(...ruleFilters)
-    rawProducts = await Product.find({ $or: orClauses }).limit(500).lean() as Record<string, unknown>[]
+    rawProducts = await Product.find({ ...storeViewFilter, $or: orClauses }).limit(500).lean() as Record<string, unknown>[]
   } else if (hasRangeSelections) {
     // Range-only vragen: haal alle producten op voor in-memory scoring
-    rawProducts = await Product.find({}).limit(500).lean() as Record<string, unknown>[]
+    rawProducts = await Product.find(storeViewFilter).limit(500).lean() as Record<string, unknown>[]
   }
 
   if (!rawProducts.length) {
@@ -361,7 +363,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/flows/[id]/
     if (relatedPinnedIds.length) orClauses.push({ _id: { $in: relatedPinnedIds } })
     if (relatedRuleFilters.length) orClauses.push(...relatedRuleFilters)
 
-    const relatedRaw = (await Product.find({ $or: orClauses }).limit(100).lean() as Record<string, unknown>[])
+    const relatedRaw = (await Product.find({ ...storeViewFilter, $or: orClauses }).limit(100).lean() as Record<string, unknown>[])
       .filter(p => !mainIds.has(String(p._id)))
 
     const relatedPrices = relatedRaw.map(p => (p.salePrice as number) || (p.price as number) || 0)

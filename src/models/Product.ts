@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IProduct extends Document {
   externalId: string
+  storeView: string
   title: string
   description: string
   shortDescription: string
@@ -26,7 +27,8 @@ export interface IProduct extends Document {
 
 const ProductSchema = new Schema<IProduct>(
   {
-    externalId: { type: String, required: true, unique: true, index: true },
+    externalId: { type: String, required: true, index: true },
+    storeView: { type: String, default: 'NL-NL', index: true },
     title: { type: String, required: true },
     description: { type: String, default: '' },
     shortDescription: { type: String, default: '' },
@@ -49,6 +51,7 @@ const ProductSchema = new Schema<IProduct>(
   { timestamps: true }
 )
 
+ProductSchema.index({ externalId: 1, storeView: 1 }, { unique: true })
 ProductSchema.index({ title: 'text', brand: 'text', category: 'text' })
 
 export default mongoose.models.Product || mongoose.model<IProduct>('Product', ProductSchema)
