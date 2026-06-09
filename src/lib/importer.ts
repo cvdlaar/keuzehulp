@@ -270,6 +270,9 @@ async function executeImport(feedConfigId: string, logId: string): Promise<void>
       }
     }
 
+    const finalLog = await ImportLog.findById(logId, { cancelRequested: 1 }).lean()
+    if (finalLog?.cancelRequested) return
+
     await ImportLog.updateOne(
       { _id: logId },
       {

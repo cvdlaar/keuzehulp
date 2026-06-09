@@ -18,6 +18,6 @@ export async function PATCH(_req: NextRequest, { params }: Ctx) {
   const log = await ImportLog.findById(id)
   if (!log) return NextResponse.json({ error: 'Niet gevonden' }, { status: 404 })
   if (log.status !== 'running') return NextResponse.json({ error: 'Import is niet actief' }, { status: 400 })
-  await ImportLog.updateOne({ _id: id }, { cancelRequested: true })
+  await ImportLog.updateOne({ _id: id }, { cancelRequested: true, status: 'cancelled', completedAt: new Date() })
   return NextResponse.json({ ok: true })
 }
