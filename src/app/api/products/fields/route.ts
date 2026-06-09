@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     { $group: {
       _id: '$kvs.k',
       count: { $sum: { $cond: [{ $and: [{ $ne: ['$kvs.v', ''] }, { $ne: ['$kvs.v', null] }] }, 1, 0] } },
-      samples: { $push: { $cond: [{ $and: [{ $ne: ['$kvs.v', ''] }, { $ne: ['$kvs.v', null] }] }, { $toString: '$kvs.v' }, '$$REMOVE'] } },
+      samples: { $addToSet: { $cond: [{ $and: [{ $ne: ['$kvs.v', ''] }, { $ne: ['$kvs.v', null] }] }, { $toString: '$kvs.v' }, '$$REMOVE'] } },
     } },
     { $match: { count: { $gt: 0 } } },
     { $project: { _id: 1, count: 1, samples: { $slice: ['$samples', 3] } } },
@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
         const filter = { [field]: { $nin: [null, ''] } }
         const count = await Product.countDocuments(filter)
         if (count === 0) return null
-        const docs = await Product.find(filter).limit(3).select(field).lean()
-        const sample = docs
-          .map(d => String((d as Record<string, unknown>)[field]))
+        const sample = (await Product.distinct(field, filter) as unknown[])
+          .slice(0, 3)
+          .map(v => String(v))
           .filter(Boolean)
         return { key: field, count, sample }
       })
