@@ -1104,6 +1104,7 @@ export default function FlowEditorPage() {
   const [saved, setSaved] = useState(false)
   const [expandedAnswer, setExpandedAnswer] = useState<string | null>(null)
   const [collapsedQuestions, setCollapsedQuestions] = useState<Set<string>>(new Set())
+  const [dragAnswer, setDragAnswer] = useState<{ qId: string; aId: string } | null>(null)
   const [focusQuestionId, setFocusQuestionId] = useState<string | null>(null)
   const [productSearch, setProductSearch] = useState<Record<string, string>>({})
   const [productResults, setProductResults] = useState<Record<string, ProductHit[]>>({})
@@ -1218,6 +1219,22 @@ export default function FlowEditorPage() {
           ? { ...q, answers: q.answers.filter((a) => a.id !== aId) }
           : q
       ),
+    }))
+  }
+
+  const reorderAnswers = (qId: string, fromId: string, toId: string) => {
+    if (fromId === toId) return
+    update((f) => ({
+      ...f,
+      questions: f.questions.map((q) => {
+        if (q.id !== qId) return q
+        const list = [...q.answers]
+        const fromIdx = list.findIndex((a) => a.id === fromId)
+        const toIdx = list.findIndex((a) => a.id === toId)
+        const [moved] = list.splice(fromIdx, 1)
+        list.splice(toIdx, 0, moved)
+        return { ...q, answers: list }
+      }),
     }))
   }
 
@@ -1709,9 +1726,19 @@ export default function FlowEditorPage() {
                     const answerKey = `${q.id}-${a.id}`
                     const isExpanded = expandedAnswer === answerKey
                     return (
-                      <div key={a.id}>
+                      <div
+                        key={a.id}
+                        draggable
+                        onDragStart={() => setDragAnswer({ qId: q.id, aId: a.id })}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (dragAnswer && dragAnswer.qId === q.id) reorderAnswers(q.id, dragAnswer.aId, a.id)
+                          setDragAnswer(null)
+                        }}
+                        className={dragAnswer?.aId === a.id ? 'opacity-40' : ''}
+                      >
                         <div className="px-5 py-3 flex items-center gap-3">
-                          <span className="text-gray-300 text-xs">↳</span>
+                          <span className="text-gray-300 cursor-grab active:cursor-grabbing text-sm select-none">⠿</span>
                           <div className="flex-1 flex flex-col gap-0.5 min-w-0">
                             <input
                               value={a.text}
