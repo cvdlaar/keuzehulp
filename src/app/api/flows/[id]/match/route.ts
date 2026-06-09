@@ -134,7 +134,7 @@ function scoreProduct(
   // Beschikbaarheidsboost
   if (boost.availabilityBoost > 0) {
     const avail = getProductValue(product, 'availability').toLowerCase()
-    if (avail === 'in stock' || avail === 'op voorraad') {
+    if (avail === 'in_stock' || avail === 'in stock' || avail === 'op voorraad') {
       bonusScore += boost.availabilityBoost
       boostBreakdown.push({ label: 'Op voorraad', points: boost.availabilityBoost })
     }

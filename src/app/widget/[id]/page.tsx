@@ -1018,8 +1018,10 @@ export default function WidgetPage() {
                   Per {p.qtyIncrement} stuks
                 </span>
               )}
-              {p.availability === 'in stock' && (
-                <span className="text-xs text-green-600 font-medium">Op voorraad</span>
+              {(p.availability === 'in_stock' || p.availability === 'in stock') ? (
+                <span className="text-xs text-green-600 font-medium">✓ Op voorraad</span>
+              ) : (
+                <span className="text-xs text-red-600 font-medium">✕ Niet op voorraad</span>
               )}
             </div>
           </div>

@@ -48,6 +48,9 @@ interface ProductDetail {
   flows: FlowRef[]
 }
 
+const isInStock = (availability: string) =>
+  availability === 'in_stock' || availability === 'in stock' || availability === 'op voorraad'
+
 export default function ProductenPage() {
   const [data, setData] = useState<ProductsResponse | null>(null)
   const [search, setSearch] = useState('')
@@ -207,9 +210,15 @@ export default function ProductenPage() {
                     ) : formatPrice(p.price)}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.availability === 'in stock' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                      {p.availability || '—'}
-                    </span>
+                    {isInStock(p.availability) ? (
+                      <span className="flex items-center gap-1 text-xs font-medium text-green-700">
+                        <span>✓</span> Op voorraad
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs font-medium text-red-600">
+                        <span>✕</span> Niet op voorraad
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-400 font-mono text-xs">{p.externalId}</td>
                 </tr>
@@ -350,9 +359,15 @@ function ProductDetailPanel({
               {p.category && (
                 <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">{p.category}</span>
               )}
-              <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.availability === 'in stock' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                {p.availability === 'in stock' ? 'Op voorraad' : p.availability === 'out of stock' ? 'Niet op voorraad' : p.availability}
-              </span>
+              {isInStock(p.availability) ? (
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
+                  <span>✓</span> Op voorraad
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs font-medium">
+                  <span>✕</span> Niet op voorraad
+                </span>
+              )}
             </div>
           </div>
         </div>
