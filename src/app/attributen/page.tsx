@@ -15,6 +15,7 @@ export default function AttributenPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [values, setValues] = useState<Record<string, string[]>>({})
   const [loadingValues, setLoadingValues] = useState<string | null>(null)
+  const [valueSearch, setValueSearch] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetch('/api/products/fields?detail=1')
@@ -106,16 +107,28 @@ export default function AttributenPage() {
                         {loadingValues === r.key ? (
                           <p className="text-xs text-gray-400">Laden…</p>
                         ) : (
-                          <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
-                            {(values[r.key] ?? []).map((v, i) => (
-                              <span key={i} className="text-xs px-2 py-0.5 bg-white border border-gray-200 text-gray-700 rounded">
-                                {v}
-                              </span>
-                            ))}
-                            {(values[r.key] ?? []).length === 0 && (
-                              <p className="text-xs text-gray-400 italic">Geen waarden gevonden.</p>
-                            )}
-                          </div>
+                          <>
+                            <input
+                              type="text"
+                              value={valueSearch[r.key] ?? ''}
+                              onChange={e => setValueSearch(s => ({ ...s, [r.key]: e.target.value }))}
+                              onClick={e => e.stopPropagation()}
+                              placeholder="Zoeken in waarden…"
+                              className="mb-2 w-64 border border-gray-200 rounded-lg px-3 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            />
+                            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+                              {(values[r.key] ?? [])
+                                .filter(v => !valueSearch[r.key] || v.toLowerCase().includes(valueSearch[r.key].toLowerCase()))
+                                .map((v, i) => (
+                                  <span key={i} className="text-xs px-2 py-0.5 bg-white border border-gray-200 text-gray-700 rounded">
+                                    {v}
+                                  </span>
+                                ))}
+                              {(values[r.key] ?? []).filter(v => !valueSearch[r.key] || v.toLowerCase().includes(valueSearch[r.key].toLowerCase())).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">Geen waarden gevonden.</p>
+                              )}
+                            </div>
+                          </>
                         )}
                       </td>
                     </tr>
