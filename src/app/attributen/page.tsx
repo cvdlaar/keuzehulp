@@ -12,6 +12,9 @@ export default function AttributenPage() {
   const [rows, setRows] = useState<AttrRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [values, setValues] = useState<Record<string, string[]>>({})
+  const [loadingValues, setLoadingValues] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/products/fields?detail=1')
@@ -19,6 +22,20 @@ export default function AttributenPage() {
       .then(d => { setRows(d.detail ?? []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
+
+  const toggle = async (key: string) => {
+    if (expanded === key) { setExpanded(null); return }
+    setExpanded(key)
+    if (values[key]) return
+    setLoadingValues(key)
+    try {
+      const r = await fetch(`/api/products/values?field=${encodeURIComponent(key)}`)
+      const d = await r.json()
+      setValues(v => ({ ...v, [key]: d.values ?? [] }))
+    } finally {
+      setLoadingValues(null)
+    }
+  }
 
   const filtered = rows.filter(r => !search || r.key.toLowerCase().includes(search.toLowerCase()))
 
@@ -42,7 +59,6 @@ export default function AttributenPage() {
         </div>
 
         {loading && <p className="text-sm text-gray-400 p-5">Laden…</p>}
-
         {!loading && filtered.length === 0 && (
           <p className="text-sm text-gray-400 p-5 italic">Geen attributen gevonden.</p>
         )}
@@ -51,30 +67,60 @@ export default function AttributenPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr className="text-left text-gray-500">
+                <th className="px-5 py-2.5 font-medium w-8"></th>
                 <th className="px-5 py-2.5 font-medium">Veldnaam</th>
                 <th className="px-5 py-2.5 font-medium text-right w-28">Producten</th>
                 <th className="px-5 py-2.5 font-medium">Voorbeeldwaarden</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {filtered.map(r => (
-                <tr key={r.key} className="hover:bg-gray-50">
-                  <td className="px-5 py-2.5">
-                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-blue-700 font-mono">{r.key}</code>
-                  </td>
-                  <td className="px-5 py-2.5 text-right text-gray-600 tabular-nums">
-                    {r.count.toLocaleString('nl-NL')}
-                  </td>
-                  <td className="px-5 py-2.5">
-                    <div className="flex flex-wrap gap-1">
-                      {r.sample.filter(Boolean).slice(0, 3).map((v, i) => (
-                        <span key={i} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded max-w-48 truncate">
-                          {v}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
+                <>
+                  <tr
+                    key={r.key}
+                    onClick={() => toggle(r.key)}
+                    className="border-t border-gray-50 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <td className="px-5 py-2.5 text-gray-400 text-xs">
+                      {expanded === r.key ? '▾' : '▸'}
+                    </td>
+                    <td className="px-5 py-2.5">
+                      <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-blue-700 font-mono">{r.key}</code>
+                    </td>
+                    <td className="px-5 py-2.5 text-right text-gray-600 tabular-nums">
+                      {r.count.toLocaleString('nl-NL')}
+                    </td>
+                    <td className="px-5 py-2.5">
+                      <div className="flex flex-wrap gap-1">
+                        {r.sample.filter(Boolean).slice(0, 3).map((v, i) => (
+                          <span key={i} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded max-w-48 truncate">
+                            {v}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                  {expanded === r.key && (
+                    <tr key={`${r.key}-values`} className="bg-gray-50 border-t border-gray-100">
+                      <td colSpan={4} className="px-10 py-3">
+                        {loadingValues === r.key ? (
+                          <p className="text-xs text-gray-400">Laden…</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+                            {(values[r.key] ?? []).map((v, i) => (
+                              <span key={i} className="text-xs px-2 py-0.5 bg-white border border-gray-200 text-gray-700 rounded">
+                                {v}
+                              </span>
+                            ))}
+                            {(values[r.key] ?? []).length === 0 && (
+                              <p className="text-xs text-gray-400 italic">Geen waarden gevonden.</p>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>

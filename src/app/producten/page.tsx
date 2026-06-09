@@ -141,8 +141,8 @@ export default function ProductenPage() {
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Alle beschikbaarheid</option>
-          <option value="in stock">Op voorraad</option>
-          <option value="out of stock">Niet op voorraad</option>
+          <option value="in_stock">Op voorraad</option>
+          <option value="out_of_stock">Niet op voorraad</option>
         </select>
         <button
           type="submit"
