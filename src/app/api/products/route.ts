@@ -24,7 +24,13 @@ export async function GET(req: NextRequest) {
   }
 
   if (category) query.category = { $regex: category, $options: 'i' }
-  if (availability) query.availability = availability
+  if (availability === 'in_stock') {
+    query.availability = { $in: ['in_stock', 'in stock', 'op voorraad'] }
+  } else if (availability === 'out_of_stock') {
+    query.availability = { $in: ['out_of_stock', 'out of stock', 'niet op voorraad'] }
+  } else if (availability) {
+    query.availability = availability
+  }
 
   const skip = (page - 1) * limit
   const [products, total] = await Promise.all([
